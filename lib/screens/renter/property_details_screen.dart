@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/auth_service.dart';
 import 'package:odiorent/services/database_service.dart';
@@ -136,23 +135,28 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                 itemBuilder: (context, index) {
                   // Use a ternary to handle empty image lists
                   return widget.property.imageUrls.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: widget.property.imageUrls[index],
+                      ? Image.network(
+                          widget.property.imageUrls[index],
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => const Center(
-                            child: CircularProgressIndicator(
-                              color: primaryGreen,
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => const Center(
-                            child: Icon(
-                              Icons.broken_image,
-                              size: 50,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          memCacheWidth: 800,
-                          maxHeightDiskCache: 600,
+                          // Show a loading spinner while the image loads
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                color: primaryGreen,
+                              ),
+                            );
+                          },
+                          // Show a broken image icon if the image fails to load
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Icon(
+                                Icons.broken_image,
+                                size: 50,
+                                color: Colors.grey,
+                              ),
+                            );
+                          },
                         )
                       : Container(
                           color: Colors.grey[200],

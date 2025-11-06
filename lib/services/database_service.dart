@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:odiorent/models/property.dart'; // We need this to work with Property objects
 import 'package:odiorent/models/message.dart'; // For chat functionality
 
@@ -14,13 +14,9 @@ class DatabaseService {
     try {
       final propertyMap = property.toJson();
       await supabase.from('properties').insert(propertyMap);
-      if (kDebugMode) {
-        if (kDebugMode) debugPrint("Property created successfully!");
-      }
+      debugPrint("Property created successfully!");
     } catch (e) {
-      if (kDebugMode) {
-        if (kDebugMode) debugPrint("Error creating property: $e");
-      }
+      debugPrint("Error creating property: $e");
       rethrow;
     }
   }
@@ -39,7 +35,7 @@ class DatabaseService {
 
       return properties;
     } catch (e) {
-      if (kDebugMode) debugPrint("Error getting landlord properties: $e");
+      debugPrint("Error getting landlord properties: $e");
       return [];
     }
   }
@@ -57,10 +53,10 @@ class DatabaseService {
           .map((json) => Property.fromJson(json as Map<String, dynamic>))
           .toList();
 
-      if (kDebugMode) debugPrint("Fetched ${properties.length} pending properties");
+      debugPrint("Fetched ${properties.length} pending properties");
       return properties;
     } catch (e) {
-      if (kDebugMode) debugPrint("Error getting pending properties: $e");
+      debugPrint("Error getting pending properties: $e");
       return [];
     }
   }
@@ -79,9 +75,9 @@ class DatabaseService {
           .update({'status': status})
           .eq('id', propertyId);
 
-      if (kDebugMode) debugPrint("Property $propertyId status updated to: $status");
+      debugPrint("Property $propertyId status updated to: $status");
     } catch (e) {
-      if (kDebugMode) debugPrint("Error updating property status: $e");
+      debugPrint("Error updating property status: $e");
       rethrow;
     }
   }
@@ -104,10 +100,10 @@ class DatabaseService {
           .map((json) => Property.fromJson(json as Map<String, dynamic>))
           .toList();
 
-      if (kDebugMode) debugPrint("Fetched ${properties.length} approved properties");
+      debugPrint("Fetched ${properties.length} approved properties");
       return properties;
     } catch (e) {
-      if (kDebugMode) debugPrint("Error getting approved properties: $e");
+      debugPrint("Error getting approved properties: $e");
       // Return an empty list on error
       return [];
     }
@@ -126,7 +122,7 @@ class DatabaseService {
     required String propertyId,
   }) async {
     try {
-      if (kDebugMode) debugPrint("Getting or creating chat for property: $propertyId");
+      debugPrint("Getting or creating chat for property: $propertyId");
 
       // Check if chat already exists
       final existingChat = await supabase
@@ -138,7 +134,7 @@ class DatabaseService {
           .maybeSingle();
 
       if (existingChat != null) {
-        if (kDebugMode) debugPrint("Chat already exists: ${existingChat['id']}");
+        debugPrint("Chat already exists: ${existingChat['id']}");
         return existingChat['id'].toString();
       }
 
@@ -154,10 +150,10 @@ class DatabaseService {
           .select()
           .single();
 
-      if (kDebugMode) debugPrint("Created new chat: ${newChat['id']}");
+      debugPrint("Created new chat: ${newChat['id']}");
       return newChat['id'].toString();
     } catch (e) {
-      if (kDebugMode) debugPrint("Error getting or creating chat: $e");
+      debugPrint("Error getting or creating chat: $e");
       rethrow;
     }
   }
@@ -165,7 +161,7 @@ class DatabaseService {
   /// Get all chats for a user (either as renter or landlord)
   Future<List<Map<String, dynamic>>> getUserChats(String userId) async {
     try {
-      if (kDebugMode) debugPrint("Getting chats for user: $userId");
+      debugPrint("Getting chats for user: $userId");
 
       final chats = await supabase
           .from('chats')
@@ -178,17 +174,17 @@ class DatabaseService {
           .or('renter_id.eq.$userId,landlord_id.eq.$userId')
           .order('created_at', ascending: false);
 
-      if (kDebugMode) debugPrint("Fetched ${chats.length} chats");
+      debugPrint("Fetched ${chats.length} chats");
       return List<Map<String, dynamic>>.from(chats);
     } catch (e) {
-      if (kDebugMode) debugPrint("Error getting user chats: $e");
+      debugPrint("Error getting user chats: $e");
       return [];
     }
   }
 
   /// Get messages for a specific chat
   Stream<List<Message>> getChatMessages(String chatId) {
-    if (kDebugMode) debugPrint("Setting up message stream for chat: $chatId");
+    debugPrint("Setting up message stream for chat: $chatId");
 
     return supabase
         .from('messages')
@@ -196,7 +192,7 @@ class DatabaseService {
         .eq('chat_id', chatId)
         .order('timestamp', ascending: true)
         .map((data) {
-          if (kDebugMode) debugPrint("Received ${data.length} messages");
+          debugPrint("Received ${data.length} messages");
           return data.map((msg) => Message.fromMap(msg)).toList();
         });
   }
@@ -209,7 +205,7 @@ class DatabaseService {
     required String content,
   }) async {
     try {
-      if (kDebugMode) debugPrint("Sending message to chat: $chatId");
+      debugPrint("Sending message to chat: $chatId");
 
       final message = Message(
         chatId: chatId,
@@ -227,9 +223,9 @@ class DatabaseService {
           .update({'last_message_at': DateTime.now().toIso8601String()})
           .eq('id', chatId);
 
-      if (kDebugMode) debugPrint("Message sent successfully");
+      debugPrint("Message sent successfully");
     } catch (e) {
-      if (kDebugMode) debugPrint("Error sending message: $e");
+      debugPrint("Error sending message: $e");
       rethrow;
     }
   }

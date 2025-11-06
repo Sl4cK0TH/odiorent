@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // We'll define the AppUser model in 'lib/models/user.dart'
 // import 'package:odiorent/models/user.dart'; // Make sure this path is correct

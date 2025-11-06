@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:odiorent/models/property.dart';
 
 class PropertyCard extends StatelessWidget {
@@ -33,33 +32,36 @@ class PropertyCard extends StatelessWidget {
             borderRadius: const BorderRadius.vertical(
               top: Radius.circular(15.0),
             ),
-            child: CachedNetworkImage(
-              imageUrl: property.imageUrls.isNotEmpty
+            child: Image.network(
+              // Use the first image as the thumbnail
+              // Add a placeholder if no images exist
+              property.imageUrls.isNotEmpty
                   ? property.imageUrls.first
                   : 'https://placehold.co/600x400/grey/white?text=No+Image',
               height: 180,
               width: double.infinity,
               fit: BoxFit.cover,
-              placeholder: (context, url) => const SizedBox(
-                height: 180,
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF4CAF50),
+              // Show a loading indicator while the image loads
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return const SizedBox(
+                  height: 180,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              },
+              // Show a placeholder icon if the image fails to load
+              errorBuilder: (context, error, stackTrace) {
+                return const SizedBox(
+                  height: 180,
+                  child: Center(
+                    child: Icon(
+                      Icons.broken_image,
+                      size: 40,
+                      color: Colors.grey,
+                    ),
                   ),
-                ),
-              ),
-              errorWidget: (context, url, error) => const SizedBox(
-                height: 180,
-                child: Center(
-                  child: Icon(
-                    Icons.broken_image,
-                    size: 40,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
-              memCacheWidth: 600,  // Reduce memory usage
-              maxHeightDiskCache: 400,  // Limit disk cache size
+                );
+              },
             ),
           ),
 
