@@ -4,7 +4,6 @@ import 'package:odiorent/services/auth_service.dart';
 import 'package:odiorent/services/database_service.dart';
 import 'package:odiorent/screens/admin/admin_property_view.dart';
 import 'package:odiorent/screens/shared/welcome_screen.dart'; // For sign out
-import 'package:intl/intl.dart'; // For formatting dates
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});

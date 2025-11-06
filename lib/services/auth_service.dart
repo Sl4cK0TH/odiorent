@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // We'll define the AppUser model in 'lib/models/user.dart'
 // import 'package:odiorent/models/user.dart'; // Make sure this path is correct
@@ -50,10 +50,10 @@ class AuthService {
       }
     } on AuthException catch (e) {
       // Show a snackbar or print the error
-      debugPrint("Auth Exception: ${e.message}");
+      if (kDebugMode) debugPrint("Auth Exception: ${e.message}");
       rethrow; // Re-throw the error to handle it in the UI
     } catch (e) {
-      debugPrint("An unknown error occurred: $e");
+      if (kDebugMode) debugPrint("An unknown error occurred: $e");
       rethrow;
     }
   }
@@ -62,32 +62,32 @@ class AuthService {
   /// Signs in an existing user.
   Future<void> signIn({required String email, required String password}) async {
     try {
-      debugPrint("=== AUTH SERVICE SIGN IN ===");
-      debugPrint("Attempting to sign in with email: $email");
+      if (kDebugMode) debugPrint("=== AUTH SERVICE SIGN IN ===");
+      if (kDebugMode) debugPrint("Attempting to sign in with email: $email");
 
       final authResponse = await supabase.auth.signInWithPassword(
         email: email,
         password: password,
       );
 
-      debugPrint("Auth response received");
-      debugPrint("User ID: ${authResponse.user?.id}");
-      debugPrint("User email: ${authResponse.user?.email}");
-      debugPrint("Email confirmed: ${authResponse.user?.emailConfirmedAt}");
+      if (kDebugMode) debugPrint("Auth response received");
+      if (kDebugMode) debugPrint("User ID: ${authResponse.user?.id}");
+      if (kDebugMode) debugPrint("User email: ${authResponse.user?.email}");
+      if (kDebugMode) debugPrint("Email confirmed: ${authResponse.user?.emailConfirmedAt}");
 
       if (authResponse.user == null) {
-        debugPrint("❌ User is null in auth response");
+        if (kDebugMode) debugPrint("❌ User is null in auth response");
         throw const AuthException('Sign in failed: User is null');
       }
 
-      debugPrint("✅ Sign in successful in AuthService");
+      if (kDebugMode) debugPrint("✅ Sign in successful in AuthService");
     } on AuthException catch (e) {
-      debugPrint("❌ Auth Exception during sign in:");
-      debugPrint("   Message: ${e.message}");
-      debugPrint("   Status code: ${e.statusCode}");
+      if (kDebugMode) debugPrint("❌ Auth Exception during sign in:");
+      if (kDebugMode) debugPrint("   Message: ${e.message}");
+      if (kDebugMode) debugPrint("   Status code: ${e.statusCode}");
       rethrow;
     } catch (e) {
-      debugPrint("❌ Unknown error during sign in: $e");
+      if (kDebugMode) debugPrint("❌ Unknown error during sign in: $e");
       rethrow;
     }
   }
@@ -98,10 +98,10 @@ class AuthService {
     try {
       await supabase.auth.signOut();
     } on AuthException catch (e) {
-      debugPrint("Auth Exception: ${e.message}");
+      if (kDebugMode) debugPrint("Auth Exception: ${e.message}");
       rethrow;
     } catch (e) {
-      debugPrint("An unknown error occurred: $e");
+      if (kDebugMode) debugPrint("An unknown error occurred: $e");
       rethrow;
     }
   }
@@ -123,13 +123,13 @@ class AuthService {
       final data = response as Map<String, dynamic>?;
 
       if (data == null || data.isEmpty) {
-        debugPrint("Error getting role: User profile not found or empty.");
+        if (kDebugMode) debugPrint("Error getting role: User profile not found or empty.");
         return null;
       }
 
       return data['role'] as String;
     } catch (e) {
-      debugPrint("Error getting role: $e");
+      if (kDebugMode) debugPrint("Error getting role: $e");
       return null;
     }
   }
@@ -145,8 +145,8 @@ class AuthService {
   /// Returns null if username not found.
   Future<String?> getEmailByUsername(String username) async {
     try {
-      debugPrint("=== GET EMAIL BY USERNAME DEBUG ===");
-      debugPrint("Searching for username: '$username'");
+      if (kDebugMode) debugPrint("=== GET EMAIL BY USERNAME DEBUG ===");
+      if (kDebugMode) debugPrint("Searching for username: '$username'");
 
       // First, let's check if the user exists at all
       final userCheckResponse = await supabase
@@ -155,40 +155,40 @@ class AuthService {
           .eq('user_name', username)
           .maybeSingle();
 
-      debugPrint("Full query response: $userCheckResponse");
+      if (kDebugMode) debugPrint("Full query response: $userCheckResponse");
 
       if (userCheckResponse == null) {
-        debugPrint("❌ No user found with username: '$username'");
-        debugPrint(
+        if (kDebugMode) debugPrint("❌ No user found with username: '$username'");
+        if (kDebugMode) debugPrint(
           "   This means the username doesn't exist in the profiles table",
         );
         return null;
       }
 
-      debugPrint("✅ User found in profiles table:");
-      debugPrint("   - ID: ${userCheckResponse['id']}");
-      debugPrint("   - Username: ${userCheckResponse['user_name']}");
-      debugPrint("   - Email: ${userCheckResponse['email']}");
+      if (kDebugMode) debugPrint("✅ User found in profiles table:");
+      if (kDebugMode) debugPrint("   - ID: ${userCheckResponse['id']}");
+      if (kDebugMode) debugPrint("   - Username: ${userCheckResponse['user_name']}");
+      if (kDebugMode) debugPrint("   - Email: ${userCheckResponse['email']}");
 
       final email = userCheckResponse['email'] as String?;
 
       if (email == null || email.isEmpty) {
-        debugPrint("⚠️  User exists but email field is NULL or empty!");
-        debugPrint(
+        if (kDebugMode) debugPrint("⚠️  User exists but email field is NULL or empty!");
+        if (kDebugMode) debugPrint(
           "   This user was created before the email field was added to signup.",
         );
-        debugPrint(
+        if (kDebugMode) debugPrint(
           "   You need to manually update this user's email in the database.",
         );
         return null;
       }
 
-      debugPrint("✅ Found email for username '$username': $email");
-      debugPrint("=== END DEBUG ===");
+      if (kDebugMode) debugPrint("✅ Found email for username '$username': $email");
+      if (kDebugMode) debugPrint("=== END DEBUG ===");
       return email;
     } catch (e) {
-      debugPrint("❌ Error getting email by username: $e");
-      debugPrint("   Stack trace: ${StackTrace.current}");
+      if (kDebugMode) debugPrint("❌ Error getting email by username: $e");
+      if (kDebugMode) debugPrint("   Stack trace: ${StackTrace.current}");
       return null;
     }
   }
@@ -197,24 +197,24 @@ class AuthService {
   /// Helper method to see what's in the profiles table (for debugging)
   Future<void> debugPrintAllProfiles() async {
     try {
-      debugPrint("=== FETCHING ALL PROFILES FOR DEBUG ===");
+      if (kDebugMode) debugPrint("=== FETCHING ALL PROFILES FOR DEBUG ===");
       final response = await supabase
           .from('profiles')
           .select('id, user_name, email, role')
           .limit(10);
 
-      debugPrint("Total profiles found: ${(response as List).length}");
+      if (kDebugMode) debugPrint("Total profiles found: ${(response as List).length}");
       for (var i = 0; i < response.length; i++) {
         final profile = response[i];
-        debugPrint("Profile ${i + 1}:");
-        debugPrint("  - ID: ${profile['id']}");
-        debugPrint("  - Username: ${profile['user_name']}");
-        debugPrint("  - Email: ${profile['email']}");
-        debugPrint("  - Role: ${profile['role']}");
+        if (kDebugMode) debugPrint("Profile ${i + 1}:");
+        if (kDebugMode) debugPrint("  - ID: ${profile['id']}");
+        if (kDebugMode) debugPrint("  - Username: ${profile['user_name']}");
+        if (kDebugMode) debugPrint("  - Email: ${profile['email']}");
+        if (kDebugMode) debugPrint("  - Role: ${profile['role']}");
       }
-      debugPrint("=== END DEBUG ===");
+      if (kDebugMode) debugPrint("=== END DEBUG ===");
     } catch (e) {
-      debugPrint("Error fetching profiles: $e");
+      if (kDebugMode) debugPrint("Error fetching profiles: $e");
     }
   }
 }

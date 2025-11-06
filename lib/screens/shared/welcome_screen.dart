@@ -21,7 +21,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   static const Color darkGreen = Color(
     0xFF388E3C,
   ); // Dark green for gradient end
-  static const Color darkText = Color(0xFF1B5E20); // Dark green text
 
   late AnimationController _animationController;
   late Animation<double> _logoAnimation;

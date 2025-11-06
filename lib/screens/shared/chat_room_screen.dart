@@ -78,14 +78,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       );
 
       _messageController.clear();
-      
+
       // Scroll to bottom after sending
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending message: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error sending message: $e')));
       }
     }
   }
@@ -97,10 +97,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.otherUserEmail,
-              style: const TextStyle(fontSize: 16),
-            ),
+            Text(widget.otherUserEmail, style: const TextStyle(fontSize: 16)),
             Text(
               widget.propertyName,
               style: const TextStyle(fontSize: 12, color: Colors.white70),
@@ -124,9 +121,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 }
 
                 if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Error: ${snapshot.error}'),
-                  );
+                  return Center(child: Text('Error: ${snapshot.error}'));
                 }
 
                 final messages = snapshot.data ?? [];
@@ -209,7 +204,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25),
-                        borderSide: const BorderSide(color: primaryGreen, width: 2),
+                        borderSide: const BorderSide(
+                          color: primaryGreen,
+                          width: 2,
+                        ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20,
@@ -244,8 +242,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment:
-            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         children: [
           if (!isMe)
             CircleAvatar(

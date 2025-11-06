@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/database_service.dart';
 
@@ -74,18 +75,17 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
               child: PageView.builder(
                 itemCount: widget.property.imageUrls.length,
                 itemBuilder: (context, index) {
-                  return Image.network(
-                    widget.property.imageUrls[index],
+                  return CachedNetworkImage(
+                    imageUrl: widget.property.imageUrls[index],
                     fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return const Center(child: CircularProgressIndicator());
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(
-                        child: Icon(Icons.broken_image, size: 50),
-                      );
-                    },
+                    placeholder: (context, url) => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                    errorWidget: (context, url, error) => const Center(
+                      child: Icon(Icons.broken_image, size: 50),
+                    ),
+                    memCacheWidth: 800,
+                    maxHeightDiskCache: 600,
                   );
                 },
               ),

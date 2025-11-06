@@ -34,7 +34,9 @@ class Message {
       senderId: map['sender_id'] ?? '',
       senderEmail: map['sender_email'] ?? '',
       content: map['content'] ?? '',
-      timestamp: DateTime.parse(map['timestamp'] ?? DateTime.now().toIso8601String()),
+      timestamp: DateTime.parse(
+        map['timestamp'] ?? DateTime.now().toIso8601String(),
+      ),
     );
   }
 }

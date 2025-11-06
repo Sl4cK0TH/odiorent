@@ -17,7 +17,6 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   // --- Define Brand Colors (Green Palette) ---
   static const Color primaryGreen = Color(0xFF4CAF50);
   static const Color lightGreen = Color(0xFF66BB6A);
-  static const Color darkGreen = Color(0xFF388E3C);
 
   // Navigation state
   int _selectedIndex = 0;
