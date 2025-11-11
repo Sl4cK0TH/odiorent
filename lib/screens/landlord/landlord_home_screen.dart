@@ -27,6 +27,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   List<Property> _allProperties = [];
   List<Property> _filteredProperties = [];
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode(); // For search auto-focus
   bool _isSearching = false;
 
   String _userName = 'Landlord';
@@ -43,6 +44,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose(); // Dispose the focus node
     super.dispose();
   }
 
@@ -67,17 +69,19 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   }
 
   void _onItemTapped(int index) {
-    if (index == 2) {
-      _navigateToAddProperty();
-    } else {
-      setState(() {
-        _selectedIndex = index;
-        if (index != 1) {
-          _isSearching = false;
-          _searchController.clear();
-        }
-      });
-    }
+    setState(() {
+      _selectedIndex = index;
+      if (index != 1) {
+        _isSearching = false;
+        _searchController.clear();
+        _searchFocusNode.unfocus(); // Unfocus when leaving search tab
+      } else {
+        // Request focus when search tab is selected
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _searchFocusNode.requestFocus();
+        });
+      }
+    });
   }
 
   void _searchProperties(String query) {
@@ -120,6 +124,14 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
         if (didPop) {
           return;
         }
+        // If the user is not on the Home tab, navigate to it.
+        if (_selectedIndex != 0) {
+          setState(() {
+            _selectedIndex = 0;
+          });
+          return;
+        }
+        // If on the Home tab, proceed with double-tap-to-exit logic.
         final now = DateTime.now();
         const maxDuration = Duration(seconds: 2);
         final isWarning =
@@ -144,11 +156,11 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
         body: IndexedStack(
           index: _selectedIndex,
           children: [
-            _buildHomeTab(),
-            _buildSearchTab(),
-            Container(),
-            _buildNotificationsTab(),
-            _buildAccountTab(),
+            _buildHomeTab(), // 0
+            _buildSearchTab(), // 1
+            _buildEditTab(), // 2
+            _buildNotificationsTab(), // 3
+            _buildAccountTab(), // 4
           ],
         ),
         bottomNavigationBar: _buildBottomNavigationBar(),
@@ -168,92 +180,33 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
       slivers: [
         SliverAppBar(
           automaticallyImplyLeading: false,
-          expandedHeight: 120,
+          // No expanded height, just a regular app bar
           floating: false,
           pinned: true,
           backgroundColor: lightGreen,
-          flexibleSpace: FlexibleSpaceBar(
-            background: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [lightGreen, primaryGreen],
-                ),
-              ),
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _onItemTapped(4),
-                        child: Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                            border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(51),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: _userProfileImage != null
-                              ? ClipOval(
-                                  child: Image.network(
-                                    _userProfileImage!,
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.person,
-                                  size: 35,
-                                  color: primaryGreen,
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text(
-                              'Welcome back,',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _userName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.logout, color: Colors.white),
-                        onPressed: _handleLogout,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+          title: const Text(
+            'OdioRent',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
             ),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(
+                Icons.notifications_outlined,
+                color: Colors.white,
+              ),
+              onPressed: () => _onItemTapped(3), // Index 3 is Notifications
+            ),
+            IconButton(
+              icon: const Icon(Icons.message_outlined, color: Colors.white),
+              onPressed: () {
+                Fluttertoast.showToast(msg: "Messages screen coming soon!");
+              },
+            ),
+          ],
         ),
         SliverToBoxAdapter(
           child: Padding(
@@ -335,78 +288,103 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   }
 
   Widget _buildSearchTab() {
+    return SafeArea(
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TextField(
+                focusNode: _searchFocusNode,
+                controller: _searchController,
+                onChanged: (value) {
+                  _isSearching = true;
+                  _searchProperties(value);
+                },
+                decoration: InputDecoration(
+                  hintText: 'Search by name or location...',
+                  prefixIcon: const Icon(Icons.search, color: primaryGreen),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            _searchProperties('');
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(color: primaryGreen),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(color: primaryGreen, width: 2),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          _filteredProperties.isEmpty
+              ? SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off, size: 80, color: Colors.grey[300]),
+                        const SizedBox(height: 16),
+                        Text(
+                          _searchController.text.isEmpty
+                              ? 'Start searching for your properties'
+                              : 'No properties found',
+                          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final property = _filteredProperties[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
+                      ),
+                      child: PropertyCard(property: property),
+                    );
+                  }, childCount: _filteredProperties.length),
+                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditTab() {
     return CustomScrollView(
       slivers: [
         SliverAppBar(
           automaticallyImplyLeading: false,
           pinned: true,
           backgroundColor: lightGreen,
-          title: const Text('Search Properties'),
+          title: const Text('Edit Properties'),
           foregroundColor: Colors.white,
         ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) {
-                _isSearching = true;
-                _searchProperties(value);
-              },
-              decoration: InputDecoration(
-                hintText: 'Search by name or location...',
-                prefixIcon: const Icon(Icons.search, color: primaryGreen),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _searchProperties('');
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: const BorderSide(color: primaryGreen),
+        SliverFillRemaining(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.edit_note, size: 80, color: Colors.grey[300]),
+                const SizedBox(height: 16),
+                Text(
+                  'Edit functionality coming soon',
+                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: const BorderSide(color: primaryGreen, width: 2),
-                ),
-              ),
+              ],
             ),
           ),
         ),
-        _filteredProperties.isEmpty
-            ? SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_off, size: 80, color: Colors.grey[300]),
-                      const SizedBox(height: 16),
-                      Text(
-                        _searchController.text.isEmpty
-                            ? 'Start searching for your properties'
-                            : 'No properties found',
-                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final property = _filteredProperties[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 8.0,
-                    ),
-                    child: PropertyCard(property: property),
-                  );
-                }, childCount: _filteredProperties.length),
-              ),
       ],
     );
   }
@@ -463,140 +441,43 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
         ],
       ),
       child: BottomAppBar(
+        height: 54,
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
-        child: SizedBox(
-          height: 60,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => _onItemTapped(0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _selectedIndex == 0 ? Icons.home : Icons.home_outlined,
-                        color: _selectedIndex == 0
-                            ? primaryGreen
-                            : Colors.grey[600],
-                        size: 24,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Home',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _selectedIndex == 0
-                              ? primaryGreen
-                              : Colors.grey[600],
-                          fontWeight: _selectedIndex == 0
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: InkWell(
-                  onTap: () => _onItemTapped(1),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.search,
-                        color: _selectedIndex == 1
-                            ? primaryGreen
-                            : Colors.grey[600],
-                        size: 24,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Search',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _selectedIndex == 1
-                              ? primaryGreen
-                              : Colors.grey[600],
-                          fontWeight: _selectedIndex == 1
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 40),
-              Expanded(
-                child: InkWell(
-                  onTap: () => _onItemTapped(3),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _selectedIndex == 3
-                            ? Icons.notifications
-                            : Icons.notifications_outlined,
-                        color: _selectedIndex == 3
-                            ? primaryGreen
-                            : Colors.grey[600],
-                        size: 24,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Notifications',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _selectedIndex == 3
-                              ? primaryGreen
-                              : Colors.grey[600],
-                          fontWeight: _selectedIndex == 3
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: InkWell(
-                  onTap: () => _onItemTapped(4),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _selectedIndex == 4
-                            ? Icons.person
-                            : Icons.person_outline,
-                        color: _selectedIndex == 4
-                            ? primaryGreen
-                            : Colors.grey[600],
-                        size: 24,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Account',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _selectedIndex == 4
-                              ? primaryGreen
-                              : Colors.grey[600],
-                          fontWeight: _selectedIndex == 4
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(icon: Icons.home_outlined, activeIcon: Icons.home, index: 0),
+            _buildNavItem(icon: Icons.search, activeIcon: Icons.search, index: 1),
+            const SizedBox(width: 40), // The gap for the FAB
+            _buildNavItem(icon: Icons.edit_outlined, activeIcon: Icons.edit, index: 2),
+            _buildNavItem(icon: Icons.person_outline, activeIcon: Icons.person, index: 4),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required IconData icon,
+    required IconData activeIcon,
+    required int index,
+  }) {
+    final isSelected = _selectedIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => _onItemTapped(index),
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isSelected ? activeIcon : icon,
+              color: isSelected ? primaryGreen : Colors.grey[600],
+              size: 28,
+            ),
+          ],
         ),
       ),
     );

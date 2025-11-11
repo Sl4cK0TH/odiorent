@@ -76,19 +76,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           automaticallyImplyLeading: false, // This removes the back button
           actions: [
             IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () async {
-                final navigator = Navigator.of(context);
-                await _authService.signOut();
-                if (mounted) {
-                  // Go back to the very first screen
-                  navigator.pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (context) => const WelcomeScreen(),
-                    ),
-                    (route) => false,
-                  );
-                }
+              icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+              onPressed: () {
+                Fluttertoast.showToast(msg: "Notifications screen coming soon!");
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.message_outlined, color: Colors.white),
+              onPressed: () {
+                Fluttertoast.showToast(msg: "Messages screen coming soon!");
               },
             ),
           ],

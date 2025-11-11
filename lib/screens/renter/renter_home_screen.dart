@@ -34,6 +34,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
 
   // Search
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode(); // For search auto-focus
   bool _isSearching = false;
 
   // User data
@@ -51,6 +52,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose(); // Dispose the focus node
     super.dispose();
   }
 
@@ -78,6 +80,12 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
       if (index != 1) {
         _isSearching = false;
         _searchController.clear();
+        _searchFocusNode.unfocus(); // Unfocus when leaving search tab
+      } else {
+        // Request focus when search tab is selected
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _searchFocusNode.requestFocus();
+        });
       }
     });
   }
@@ -109,6 +117,14 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
         if (didPop) {
           return;
         }
+        // If the user is not on the Home tab, navigate to it.
+        if (_selectedIndex != 0) {
+          setState(() {
+            _selectedIndex = 0;
+          });
+          return;
+        }
+        // If on the Home tab, proceed with double-tap-to-exit logic.
         final now = DateTime.now();
         const maxDuration = Duration(seconds: 2);
         final isWarning =
@@ -134,7 +150,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
           children: [
             _buildHomeTab(),
             _buildSearchTab(),
-            _buildNotificationsTab(),
+            _buildNotificationsTab(), // This is now a placeholder tab
             _buildAccountTab(),
           ],
         ),
@@ -150,90 +166,34 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
         // Custom App Bar with User Profile
         SliverAppBar(
           automaticallyImplyLeading: false,
-          expandedHeight: 120,
+          expandedHeight: 80,
           floating: false,
           pinned: true,
           backgroundColor: lightGreen,
-          flexibleSpace: FlexibleSpaceBar(
-            background: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [lightGreen, primaryGreen],
-                ),
-              ),
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                  child: Row(
-                    children: [
-                      // Profile Picture
-                      GestureDetector(
-                        onTap: () => _onItemTapped(3),
-                        child: Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                            border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(51),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: _userProfileImage != null
-                              ? ClipOval(
-                                  child: Image.network(
-                                    _userProfileImage!,
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.person,
-                                  size: 35,
-                                  color: primaryGreen,
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      // User Name and Welcome Text
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text(
-                              'Hello,',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _userName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+          title: const Text(
+            'OdioRent',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
             ),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(
+                Icons.notifications_outlined,
+                color: Colors.white,
+              ),
+              onPressed: () => _onItemTapped(2), // Index 2 is Notifications
+            ),
+            IconButton(
+              icon: const Icon(Icons.message_outlined, color: Colors.white),
+              onPressed: () {
+                // TODO: Navigate to a messages/chat list screen
+                Fluttertoast.showToast(msg: "Messages screen coming soon!");
+              },
+            ),
+          ],
         ),
 
         // Section Title
@@ -339,89 +299,85 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
 
   // Search Tab
   Widget _buildSearchTab() {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          automaticallyImplyLeading: false,
-          pinned: true,
-          backgroundColor: lightGreen,
-          title: const Text('Search Properties'),
-          foregroundColor: Colors.white,
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) {
-                _isSearching = true;
-                _searchProperties(value);
-              },
-              decoration: InputDecoration(
-                hintText: 'Search by name or location...',
-                prefixIcon: const Icon(Icons.search, color: primaryGreen),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _searchProperties('');
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: const BorderSide(color: primaryGreen),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: const BorderSide(color: primaryGreen, width: 2),
+    return SafeArea(
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TextField(
+                focusNode: _searchFocusNode,
+                controller: _searchController,
+                onChanged: (value) {
+                  _isSearching = true;
+                  _searchProperties(value);
+                },
+                decoration: InputDecoration(
+                  hintText: 'Search by name or location...',
+                  prefixIcon: const Icon(Icons.search, color: primaryGreen),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            _searchProperties('');
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(color: primaryGreen),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(color: primaryGreen, width: 2),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-        _filteredProperties.isEmpty
-            ? SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_off, size: 80, color: Colors.grey[300]),
-                      const SizedBox(height: 16),
-                      Text(
-                        _searchController.text.isEmpty
-                            ? 'Start searching for properties'
-                            : 'No properties found',
-                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                      ),
-                    ],
+          _filteredProperties.isEmpty
+              ? SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off, size: 80, color: Colors.grey[300]),
+                        const SizedBox(height: 16),
+                        Text(
+                          _searchController.text.isEmpty
+                              ? 'Start searching for properties'
+                              : 'No properties found',
+                          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
                   ),
+                )
+              : SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final property = _filteredProperties[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
+                      ),
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  PropertyDetailsScreen(property: property),
+                            ),
+                          );
+                        },
+                        child: PropertyCard(property: property),
+                      ),
+                    );
+                  }, childCount: _filteredProperties.length),
                 ),
-              )
-            : SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final property = _filteredProperties[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 8.0,
-                    ),
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                PropertyDetailsScreen(property: property),
-                          ),
-                        );
-                      },
-                      child: PropertyCard(property: property),
-                    ),
-                  );
-                }, childCount: _filteredProperties.length),
-              ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -589,36 +545,67 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
 
   // Bottom Navigation Bar
   Widget _buildBottomNavigationBar() {
-    return BottomNavigationBar(
-      currentIndex: _selectedIndex,
-      onTap: _onItemTapped,
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: primaryGreen,
-      unselectedItemColor: Colors.grey[600],
-      selectedFontSize: 12,
-      unselectedFontSize: 12,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home),
-          label: 'Home',
+    return BottomAppBar(
+      height: 54,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildNavItem(
+            icon: Icons.home_outlined,
+            activeIcon: Icons.home,
+            index: 0,
+          ),
+          _buildNavItem(
+            icon: Icons.search,
+            activeIcon: Icons.search,
+            index: 1,
+          ),
+          // Disabled placeholder for 'Edit'
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.edit_outlined,
+                  color: Colors.grey[300],
+                  size: 28,
+                ),
+              ],
+            ),
+          ),
+          _buildNavItem(
+            icon: Icons.person_outline,
+            activeIcon: Icons.person,
+            index: 3,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper widget for each navigation item
+  Widget _buildNavItem({
+    required IconData icon,
+    required IconData activeIcon,
+    required int index,
+  }) {
+    final isSelected = _selectedIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => _onItemTapped(index),
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isSelected ? activeIcon : icon,
+              color: isSelected ? primaryGreen : Colors.grey[600],
+              size: 28,
+            ),
+          ],
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.search),
-          activeIcon: Icon(Icons.search),
-          label: 'Search',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.notifications_outlined),
-          activeIcon: Icon(Icons.notifications),
-          label: 'Notifications',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline),
-          activeIcon: Icon(Icons.person),
-          label: 'Account',
-        ),
-      ],
+      ),
     );
   }
 
