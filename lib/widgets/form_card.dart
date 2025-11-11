@@ -32,7 +32,7 @@ class FormCard extends StatelessWidget {
         borderRadius: customBorderRadius ?? BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withAlpha(26),
             blurRadius: elevation * 2,
             offset: Offset(0, elevation),
           ),

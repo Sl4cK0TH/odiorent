@@ -183,7 +183,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: Colors.grey.withAlpha(51),
                   spreadRadius: 1,
                   blurRadius: 5,
                   offset: const Offset(0, -2),
@@ -293,7 +293,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           if (isMe) const SizedBox(width: 8),
           if (isMe)
             CircleAvatar(
-              backgroundColor: primaryGreen.withOpacity(0.3),
+              backgroundColor: primaryGreen.withAlpha(77),
               radius: 16,
               child: Text(
                 message.senderEmail[0].toUpperCase(),

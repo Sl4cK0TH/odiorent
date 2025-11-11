@@ -99,7 +99,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
+              color: Colors.grey.withAlpha(51),
               spreadRadius: 2,
               blurRadius: 5,
             ),
@@ -263,10 +263,10 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
     return Chip(
       avatar: Icon(icon, size: 18, color: darkGreen),
       label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-      backgroundColor: primaryGreen.withOpacity(0.1),
+      backgroundColor: primaryGreen.withAlpha(26),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: primaryGreen.withOpacity(0.3)),
+        side: BorderSide(color: primaryGreen.withAlpha(77)),
       ),
     );
   }

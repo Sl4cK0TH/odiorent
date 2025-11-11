@@ -21,7 +21,6 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _fadeAnimation;
 
   // Define your brand colors (Green Palette)
-  static const Color primaryGreen = Color(0xFF4CAF50); // Main green
   static const Color lightGreen = Color(0xFF66BB6A); // Light green for gradient
   static const Color darkGreen = Color(0xFF388E3C); // Dark green for gradient
 

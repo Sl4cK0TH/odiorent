@@ -102,12 +102,25 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       // Show success message
+      final screenHeight = MediaQuery.of(context).size.height;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Login successful!'),
+        SnackBar(
+          content: const Text('Login successful!'),
           backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.only(
+            bottom: screenHeight - 120, // Pushes it to 120px from the top
+            left: 16,
+            right: 16,
+          ),
+          duration: const Duration(milliseconds: 1500),
         ),
       );
+
+      // Wait for SnackBar to be visible
+      await Future.delayed(const Duration(milliseconds: 1500));
+
+      if (!mounted) return;
 
       // Navigate to appropriate screen based on user role
       if (role == 'admin') {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/auth_service.dart';
 import 'package:odiorent/services/database_service.dart';
@@ -37,6 +38,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   // User data
   String _userName = 'Renter';
   String? _userProfileImage;
+  DateTime? lastPressed; // For double-tap to exit
 
   @override
   void initState() {
@@ -100,17 +102,41 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          _buildHomeTab(),
-          _buildSearchTab(),
-          _buildNotificationsTab(),
-          _buildAccountTab(),
-        ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, _) {
+        if (didPop) {
+          return;
+        }
+        final now = DateTime.now();
+        const maxDuration = Duration(seconds: 2);
+        final isWarning =
+            lastPressed == null || now.difference(lastPressed!) > maxDuration;
+
+        if (isWarning) {
+          lastPressed = DateTime.now();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Press back again to exit'),
+              duration: maxDuration,
+            ),
+          );
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: [
+            _buildHomeTab(),
+            _buildSearchTab(),
+            _buildNotificationsTab(),
+            _buildAccountTab(),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomNavigationBar(),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
@@ -120,6 +146,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
       slivers: [
         // Custom App Bar with User Profile
         SliverAppBar(
+          automaticallyImplyLeading: false,
           expandedHeight: 120,
           floating: false,
           pinned: true,
@@ -150,7 +177,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                             border: Border.all(color: Colors.white, width: 3),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
+                                color: Colors.black.withAlpha(51),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -312,6 +339,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
     return CustomScrollView(
       slivers: [
         SliverAppBar(
+          automaticallyImplyLeading: false,
           pinned: true,
           backgroundColor: lightGreen,
           title: const Text('Search Properties'),
@@ -399,6 +427,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
     return CustomScrollView(
       slivers: [
         SliverAppBar(
+          automaticallyImplyLeading: false,
           pinned: true,
           backgroundColor: lightGreen,
           title: const Text('Notifications'),
@@ -438,6 +467,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
     return CustomScrollView(
       slivers: [
         SliverAppBar(
+          automaticallyImplyLeading: false,
           pinned: true,
           backgroundColor: lightGreen,
           title: const Text('Account Settings'),
@@ -459,7 +489,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                     border: Border.all(color: primaryGreen, width: 4),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withAlpha(26),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),

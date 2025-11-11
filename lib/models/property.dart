@@ -1,6 +1,3 @@
-/// This file defines the data model for a Property.
-/// It matches the 'properties' table in your Supabase database.
-
 class Property {
   // --- Class Fields ---
 

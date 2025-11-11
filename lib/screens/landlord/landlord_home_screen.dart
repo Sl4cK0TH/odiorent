@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/auth_service.dart';
 import 'package:odiorent/services/database_service.dart';
@@ -29,6 +30,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
 
   String _userName = 'Landlord';
   String? _userProfileImage;
+  DateTime? lastPressed; // For double-tap to exit
 
   @override
   void initState() {
@@ -111,25 +113,50 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          _buildHomeTab(),
-          _buildSearchTab(),
-          Container(),
-          _buildNotificationsTab(),
-          _buildAccountTab(),
-        ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, _) {
+        if (didPop) {
+          return;
+        }
+        final now = DateTime.now();
+        const maxDuration = Duration(seconds: 2);
+        final isWarning =
+            lastPressed == null || now.difference(lastPressed!) > maxDuration;
+
+        if (isWarning) {
+          lastPressed = DateTime.now();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Press back again to exit'),
+              duration: maxDuration,
+            ),
+          );
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: [
+            _buildHomeTab(),
+            _buildSearchTab(),
+            Container(),
+            _buildNotificationsTab(),
+            _buildAccountTab(),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomNavigationBar(),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _navigateToAddProperty,
+          backgroundColor: primaryGreen,
+          shape: const CircleBorder(),
+          child: const Icon(Icons.add, size: 32),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _navigateToAddProperty,
-        backgroundColor: primaryGreen,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add, size: 32),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
@@ -137,6 +164,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
     return CustomScrollView(
       slivers: [
         SliverAppBar(
+          automaticallyImplyLeading: false,
           expandedHeight: 120,
           floating: false,
           pinned: true,
@@ -166,7 +194,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
                             border: Border.all(color: Colors.white, width: 3),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
+                                color: Colors.black.withAlpha(51),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -307,6 +335,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
     return CustomScrollView(
       slivers: [
         SliverAppBar(
+          automaticallyImplyLeading: false,
           pinned: true,
           backgroundColor: lightGreen,
           title: const Text('Search Properties'),
@@ -383,6 +412,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
     return CustomScrollView(
       slivers: [
         SliverAppBar(
+          automaticallyImplyLeading: false,
           pinned: true,
           backgroundColor: lightGreen,
           title: const Text('Notifications'),
@@ -422,7 +452,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
       decoration: BoxDecoration(
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.3),
+            color: Colors.grey.withAlpha(77),
             spreadRadius: 1,
             blurRadius: 10,
             offset: const Offset(0, -3),
@@ -573,6 +603,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
     return CustomScrollView(
       slivers: [
         SliverAppBar(
+          automaticallyImplyLeading: false,
           pinned: true,
           backgroundColor: lightGreen,
           title: const Text('Account Settings'),
@@ -593,7 +624,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
                     border: Border.all(color: primaryGreen, width: 4),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withAlpha(26),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
