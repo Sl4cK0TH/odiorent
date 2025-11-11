@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:odiorent/widgets/custom_button.dart';
 import 'package:odiorent/widgets/login_form_card.dart';
 import 'package:odiorent/services/auth_service.dart';
@@ -102,25 +103,14 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       // Show success message
-      final screenHeight = MediaQuery.of(context).size.height;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Login successful!'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.only(
-            bottom: screenHeight - 120, // Pushes it to 120px from the top
-            left: 16,
-            right: 16,
-          ),
-          duration: const Duration(milliseconds: 1500),
-        ),
+      Fluttertoast.showToast(
+        msg: "Login successful!",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.black.withAlpha(179),
+        textColor: Colors.white,
+        fontSize: 16.0,
       );
-
-      // Wait for SnackBar to be visible
-      await Future.delayed(const Duration(milliseconds: 1500));
-
-      if (!mounted) return;
 
       // Navigate to appropriate screen based on user role
       if (role == 'admin') {

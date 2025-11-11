@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/auth_service.dart';
 import 'package:odiorent/services/database_service.dart';
@@ -126,11 +127,13 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
 
         if (isWarning) {
           lastPressed = DateTime.now();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Press back again to exit'),
-              duration: maxDuration,
-            ),
+          Fluttertoast.showToast(
+            msg: "Press back again to exit",
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: Colors.black.withAlpha(179),
+            textColor: Colors.white,
+            fontSize: 16.0,
           );
         } else {
           SystemNavigator.pop();
