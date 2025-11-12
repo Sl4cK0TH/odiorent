@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// We'll define the AppUser model in 'lib/models/user.dart'
-// import 'package:odiorent/models/user.dart'; // Make sure this path is correct
+import 'package:odiorent/models/user.dart'; // Import the AppUser model
+import 'package:odiorent/models/admin_user.dart'; // Import the AdminUser model
 
 // Get the global Supabase client
 final supabase = Supabase.instance.client;
@@ -174,6 +174,102 @@ class AuthService {
   /// A handy helper to get the currently logged-in user from Supabase.
   User? getCurrentUser() {
     return supabase.auth.currentUser;
+  }
+
+  /// --- GET CURRENT USER PROFILE ---
+  /// Fetches the full profile details of the currently logged-in user.
+  Future<AppUser?> getCurrentUserProfile() async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) {
+        return null; // No user logged in
+      }
+
+      final response = await supabase
+          .from('profiles')
+          .select('*') // Select all profile fields
+          .eq('id', user.id)
+          .single();
+
+      return AppUser.fromJson(response);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint("Error getting current user profile: $e");
+      }
+      return null;
+    }
+  }
+
+  /// --- GET CURRENT ADMIN USER PROFILE ---
+  /// Fetches the full profile details of the currently logged-in admin user.
+  /// Maps to the AdminUser model to handle potentially nullable fields for admin profiles.
+  Future<AdminUser?> getAdminUserProfile() async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) {
+        return null; // No user logged in
+      }
+
+      final response = await supabase
+          .from('profiles')
+          .select('*') // Select all profile fields
+          .eq('id', user.id)
+          .single();
+
+      return AdminUser.fromJson(response);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint("Error getting current admin user profile: $e");
+      }
+      return null;
+    }
+  }
+
+  /// --- UPDATE USER PASSWORD ---
+  /// Updates the password for the currently authenticated user.
+  Future<void> updateUserPassword({required String newPassword}) async {
+    try {
+      await supabase.auth.updateUser(UserAttributes(
+        password: newPassword,
+      ));
+    } on AuthException catch (e) {
+      if (kDebugMode) {
+        debugPrint("Auth Exception during password update: ${e.message}");
+      }
+      rethrow;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint("An unknown error occurred during password update: $e");
+      }
+      rethrow;
+    }
+  }
+
+  /// --- REAUTHENTICATE USER ---
+  /// Re-authenticates the user by attempting to sign in with provided credentials.
+  /// Used to verify the current password before sensitive operations.
+  Future<void> reauthenticateUser({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      await supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      // If signInWithPassword succeeds, it means the credentials are correct.
+      // No need to do anything else, as the user is already authenticated.
+    } on AuthException catch (e) {
+      if (kDebugMode) {
+        debugPrint("Auth Exception during reauthentication: ${e.message}");
+      }
+      rethrow; // Re-throw to indicate re-authentication failure
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint("An unknown error occurred during reauthentication: $e");
+      }
+      rethrow;
+    }
   }
 
   /// --- GET EMAIL BY USERNAME (Day 2 Task) ---

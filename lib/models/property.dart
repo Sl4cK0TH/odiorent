@@ -17,6 +17,12 @@ class Property {
   final List<String> imageUrls;
 
   final String status; // 'pending', 'approved', or 'rejected'
+  final DateTime createdAt; // New: Date when the property was created
+  final DateTime? approvedAt; // New: Date when the property was approved (nullable)
+
+  // New: Landlord details (will be populated via joins in queries)
+  final String? landlordName;
+  final String? landlordEmail;
 
   // --- Constructor ---
   Property({
@@ -30,6 +36,10 @@ class Property {
     required this.beds,
     required this.imageUrls,
     required this.status,
+    required this.createdAt, // New
+    this.approvedAt, // New (nullable)
+    this.landlordName, // New (nullable)
+    this.landlordEmail, // New (nullable)
   });
 
   /// --- `toJson` Method ---
@@ -48,6 +58,8 @@ class Property {
       'beds': beds,
       'image_urls': imageUrls,
       'status': status,
+      'created_at': createdAt.toIso8601String(), // Include created_at
+      'approved_at': approvedAt?.toIso8601String(), // Include approved_at if not null
     };
   }
 
@@ -70,6 +82,13 @@ class Property {
       // it to a List<String>.
       imageUrls: List<String>.from(json['image_urls'] as List<dynamic>),
       status: json['status'] as String,
+      createdAt: DateTime.parse(json['created_at'] as String), // Parse created_at
+      approvedAt: json['approved_at'] != null
+          ? DateTime.parse(json['approved_at'] as String)
+          : null, // Parse approved_at if not null
+      // Populate landlord details if available from a join
+      landlordName: json['profiles']?['user_name'] as String?,
+      landlordEmail: json['profiles']?['email'] as String?,
     );
   }
 }

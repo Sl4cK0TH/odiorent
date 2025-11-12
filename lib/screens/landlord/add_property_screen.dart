@@ -98,6 +98,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         beds: int.parse(_bedsController.text.trim()),
         imageUrls: imageUrls,
         status: 'pending', // Always 'pending' on creation
+        createdAt: DateTime.now(), // Set creation date
       );
 
       // 3. Save to Database

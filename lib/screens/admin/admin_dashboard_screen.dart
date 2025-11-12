@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:odiorent/models/property.dart';
-import 'package:odiorent/services/auth_service.dart';
-import 'package:odiorent/services/database_service.dart';
-import 'package:odiorent/screens/admin/admin_property_view.dart';
-import 'package:odiorent/screens/shared/welcome_screen.dart'; // For sign out
+import 'package:odiorent/services/database_service.dart'; // Re-import DatabaseService
+// Removed: import 'package:odiorent/screens/shared/welcome_screen.dart'; // For sign out (no longer directly used here)
+import 'package:odiorent/widgets/admin-widgets/statistic_card.dart'; // Import StatisticCard
+import 'package:odiorent/screens/admin/admin_property_list_screen.dart'; // Import AdminPropertyListScreen
+import 'package:odiorent/screens/admin/admin_account_screen.dart'; // Import AdminAccountScreen
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -21,24 +21,143 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   // Services
   final DatabaseService _dbService = DatabaseService();
-  final AuthService _authService = AuthService();
+  // Removed: final AuthService _authService = AuthService(); // No longer directly used here
 
   // A Future to hold the list of pending properties
-  late Future<List<Property>> _pendingPropertiesFuture;
+  // Removed: late Future<List<Property>> _pendingPropertiesFuture;
   DateTime? lastPressed; // For double-tap to exit
+
+  int _selectedIndex = 0; // To manage the selected tab
+  String? _selectedPropertyStatusFilter; // New: To store status from clicked card
+
+  // List of widgets to display for each tab
+  List<Widget> get _widgetOptions => <Widget>[
+        // 0. Dashboard Tab
+        _buildDashboardScreen(),
+
+        // 1. Properties Tab
+        AdminPropertyListScreen(
+          status: _selectedPropertyStatusFilter ?? 'overall', // Pass filter
+          title: 'Properties',
+        ),
+
+        // 2. Account Tab
+        const AdminAccountScreen(), // Use the new AdminAccountScreen
+      ];
+
+  // New: Function to handle statistic card tap and navigate to properties tab
+  void _handleStatisticCardTap(String status) {
+    setState(() {
+      _selectedPropertyStatusFilter = status;
+      _selectedIndex = 1; // Navigate to Properties tab
+    });
+  }
+
+  // Handles tab selection
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+      // If navigating to properties tab, clear the filter
+      if (index == 1) {
+        _selectedPropertyStatusFilter = null;
+        // Removed: _refreshPendingList(); // Refresh the list if it's the properties tab
+      }
+    });
+  }
+
+  // Removed: Function to refresh the list
+  // Removed: void _refreshPendingList() {
+  // Removed:   setState(() {
+  // Removed:     _pendingPropertiesFuture = _dbService.getPropertiesByStatusWithLandlordDetails('pending'); // Use new method
+  // Removed:   });
+  // Removed: }
+
+  // New: Widget for the Dashboard tab content
+  Widget _buildDashboardScreen() {
+    return FutureBuilder<Map<String, int>>(
+      future: _fetchDashboardStats(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: primaryGreen));
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text("Error: ${snapshot.error}"));
+        }
+
+        final stats = snapshot.data!;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'My Dashboard',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2, // Two cards per row
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                children: [
+                  StatisticCard(
+                    title: 'Overall Requests',
+                    count: stats['overall']!,
+                    icon: Icons.all_inclusive,
+                    color: Colors.blue,
+                    onTap: () => _handleStatisticCardTap('overall'),
+                  ),
+                  StatisticCard(
+                    title: 'Pending Requests',
+                    count: stats['pending']!,
+                    icon: Icons.hourglass_empty,
+                    color: Colors.orange,
+                    onTap: () => _handleStatisticCardTap('pending'),
+                  ),
+                  StatisticCard(
+                    title: 'Approved Requests',
+                    count: stats['approved']!,
+                    icon: Icons.check_circle,
+                    color: Colors.green,
+                    onTap: () => _handleStatisticCardTap('approved'),
+                  ),
+                  StatisticCard(
+                    title: 'Rejected Requests',
+                    count: stats['rejected']!,
+                    icon: Icons.cancel,
+                    color: Colors.red,
+                    onTap: () => _handleStatisticCardTap('rejected'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // New: Function to fetch all dashboard statistics
+  Future<Map<String, int>> _fetchDashboardStats() async {
+    final overall = await _dbService.getPropertiesCount();
+    final pending = await _dbService.getPropertiesCountByStatus('pending');
+    final approved = await _dbService.getPropertiesCountByStatus('approved');
+    final rejected = await _dbService.getPropertiesCountByStatus('rejected');
+
+    return {
+      'overall': overall,
+      'pending': pending,
+      'approved': approved,
+      'rejected': rejected,
+    };
+  }
 
   @override
   void initState() {
     super.initState();
-    // Initialize the future
-    _pendingPropertiesFuture = _dbService.getPendingProperties();
-  }
-
-  // Function to refresh the list
-  void _refreshPendingList() {
-    setState(() {
-      _pendingPropertiesFuture = _dbService.getPendingProperties();
-    });
+    // Removed: _widgetOptions = <Widget>[ ... ];
   }
 
   @override
@@ -70,97 +189,53 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Admin Dashboard - Pending Approvals'),
+          title: const Text(
+            'Admin Dashboard', // Changed title
+            style: TextStyle(fontWeight: FontWeight.bold), // Made bold
+          ),
           backgroundColor: lightGreen,
           foregroundColor: Colors.white,
-          automaticallyImplyLeading: false, // This removes the back button
+          automaticallyImplyLeading: false,
           actions: [
+            // Keep Notifications icon
             IconButton(
               icon: const Icon(Icons.notifications_outlined, color: Colors.white),
               onPressed: () {
                 Fluttertoast.showToast(msg: "Notifications screen coming soon!");
               },
             ),
-            IconButton(
-              icon: const Icon(Icons.message_outlined, color: Colors.white),
-              onPressed: () {
-                Fluttertoast.showToast(msg: "Messages screen coming soon!");
-              },
-            ),
           ],
         ),
-        body: FutureBuilder<List<Property>>(
-          future: _pendingPropertiesFuture,
-          builder: (context, snapshot) {
-            // --- Loading State ---
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(color: primaryGreen),
-              );
-            }
-
-            // --- Error State ---
-            if (snapshot.hasError) {
-              return Center(child: Text("Error: ${snapshot.error}"));
-            }
-
-            // --- Empty State ---
-            final properties = snapshot.data;
-            if (properties == null || properties.isEmpty) {
-              return const Center(
-                child: Text(
-                  "No properties are pending approval. Good job!",
-                  style: TextStyle(fontSize: 18, color: Colors.grey),
-                ),
-              );
-            }
-
-            // --- Success State (Show List) ---
-            return ListView.builder(
-              itemCount: properties.length,
-              itemBuilder: (context, index) {
-                final property = properties[index];
-
-                // We'll add this to 'property.dart' model later if it's not there
-                // For now, let's assume 'created_at' exists as a DateTime?
-                // String formattedDate = property.createdAt != null
-                //     ? DateFormat('MMMd, yyyy - h:mm a').format(property.createdAt!)
-                //     : 'No date';
-
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: primaryGreen,
-                    foregroundColor: Colors.white,
-                    child: Icon(
-                      property.rooms > 1 ? Icons.apartment : Icons.home,
-                    ),
-                  ),
-                  title: Text(
-                    property.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(property.address),
-                  // trailing: Text(formattedDate), // Example of date
-                  onTap: () async {
-                    // Navigate to the detail view screen
-                    final bool? needsRefresh = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            AdminPropertyViewScreen(property: property),
-                      ),
-                    );
-
-                    // If the detail screen popped and returned 'true',
-                    // it means an action was taken, so we refresh the list.
-                    if (needsRefresh == true) {
-                      _refreshPendingList();
-                    }
-                  },
-                );
-              },
-            );
-          },
+        body: _widgetOptions.elementAt(_selectedIndex), // Display selected tab content
+        bottomNavigationBar: SizedBox(
+          height: 54.0, // Set fixed height
+          child: BottomNavigationBar(
+            items: const <BottomNavigationBarItem>[
+              BottomNavigationBarItem(
+                icon: Icon(Icons.dashboard),
+                label: '', // No label
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.assignment),
+                label: '', // No label
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person),
+                label: '', // No label
+              ),
+            ],
+            currentIndex: _selectedIndex,
+            selectedItemColor: primaryGreen,
+            unselectedItemColor: Colors.black, // Changed to black for visibility
+            onTap: _onItemTapped,
+            type: BottomNavigationBarType.fixed, // Ensures all items are visible
+            showSelectedLabels: false, // No labels
+            showUnselectedLabels: false, // No labels
+            enableFeedback: false, // No splash effect
+            iconSize: 28.0, // Set icon size
+            selectedFontSize: 0.0, // Crucial for fixing overflow with hidden labels
+            unselectedFontSize: 0.0, // Crucial for fixing overflow with hidden labels
+          ),
         ),
       ),
     );

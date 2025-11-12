@@ -9,6 +9,12 @@ final supabase = Supabase.instance.client;
 /// This class will handle all database interactions with Supabase.
 /// We will add all our database-related functions here.
 class DatabaseService {
+  // Helper query string for selecting properties with joined landlord details
+  static const String _propertySelectQuery = '''
+    *,
+    profiles!landlord_id(user_name, email)
+  ''';
+
   /// --- CREATE PROPERTY (Day 3 Task) ---
   Future<void> createProperty(Property property) async {
     try {
@@ -26,7 +32,7 @@ class DatabaseService {
     try {
       final response = await supabase
           .from('properties')
-          .select()
+          .select(_propertySelectQuery) // Use the helper query
           .eq('landlord_id', landlordId);
 
       final properties = (response as List<dynamic>)
@@ -41,11 +47,13 @@ class DatabaseService {
   }
 
   /// --- GET PENDING PROPERTIES (Admin Function) ---
+  /// This method is now deprecated in favor of getPropertiesByStatusWithLandlordDetails
+  /// but kept for existing usage.
   Future<List<Property>> getPendingProperties() async {
     try {
       final response = await supabase
           .from('properties')
-          .select()
+          .select(_propertySelectQuery) // Use the helper query
           .eq('status', 'pending')
           .order('created_at', ascending: false);
 
@@ -61,6 +69,48 @@ class DatabaseService {
     }
   }
 
+  /// --- GET ALL PROPERTIES WITH LANDLORD DETAILS (Admin Function) ---
+  Future<List<Property>> getAllPropertiesWithLandlordDetails() async {
+    try {
+      final response = await supabase
+          .from('properties')
+          .select(_propertySelectQuery)
+          .order('created_at', ascending: false);
+
+      final properties = (response as List<dynamic>)
+          .map((json) => Property.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      debugPrint("Fetched ${properties.length} overall properties with landlord details");
+      return properties;
+    } catch (e) {
+      debugPrint("Error getting all properties with landlord details: $e");
+      return [];
+    }
+  }
+
+  /// --- GET PROPERTIES BY STATUS WITH LANDLORD DETAILS (Admin Function) ---
+  Future<List<Property>> getPropertiesByStatusWithLandlordDetails(
+      String status) async {
+    try {
+      final response = await supabase
+          .from('properties')
+          .select(_propertySelectQuery)
+          .eq('status', status)
+          .order('created_at', ascending: false);
+
+      final properties = (response as List<dynamic>)
+          .map((json) => Property.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      debugPrint("Fetched ${properties.length} $status properties with landlord details");
+      return properties;
+    } catch (e) {
+      debugPrint("Error getting $status properties with landlord details: $e");
+      return [];
+    }
+  }
+
   /// --- UPDATE PROPERTY STATUS (Admin Function) ---
   Future<void> updatePropertyStatus(String propertyId, String status) async {
     try {
@@ -70,14 +120,45 @@ class DatabaseService {
         );
       }
 
+      final Map<String, dynamic> updateData = {'status': status};
+      if (status == 'approved') {
+        updateData['approved_at'] = DateTime.now().toIso8601String();
+      } else {
+        updateData['approved_at'] = null; // Clear approved_at if status changes from approved
+      }
+
       await supabase
           .from('properties')
-          .update({'status': status})
+          .update(updateData)
           .eq('id', propertyId);
 
       debugPrint("Property $propertyId status updated to: $status");
     } catch (e) {
       debugPrint("Error updating property status: $e");
+      rethrow;
+    }
+  }
+
+  /// --- UPDATE USER PROFILE ---
+  /// Updates the first name, middle name, and last name of a user in the 'profiles' table.
+  Future<void> updateUserProfile({
+    required String userId,
+    required String firstName,
+    String? middleName,
+    required String lastName,
+    required String phoneNumber, // New parameter
+  }) async {
+    try {
+      final Map<String, dynamic> updates = {
+        'first_name': firstName,
+        'last_name': lastName,
+        'middle_name': middleName, // Will be null if not provided
+        'phone_number': phoneNumber, // Update phone number
+      };
+
+      await supabase.from('profiles').update(updates).eq('id', userId);
+    } catch (e) {
+      debugPrint("Error updating user profile: $e");
       rethrow;
     }
   }
@@ -91,7 +172,7 @@ class DatabaseService {
       // Select all properties where status is 'approved'
       final response = await supabase
           .from('properties')
-          .select()
+          .select(_propertySelectQuery) // Use the helper query
           .eq('status', 'approved')
           .order('created_at', ascending: false); // Most recent first
 
@@ -109,9 +190,38 @@ class DatabaseService {
     }
   }
 
-  // --- We will add more functions here as we build the app ---
-  // - getOrCreateChat() (for Day 6)
-  // - etc.
+  /// --- GET ALL PROPERTIES COUNT (Admin Function) ---
+  /// Fetches the total number of properties in the database.
+  Future<int> getPropertiesCount() async {
+    try {
+      final response = await supabase
+          .from('properties')
+          .select('count')
+          .single(); // Use .single() to get the count directly
+
+      return response['count'] as int;
+    } catch (e) {
+      debugPrint("Error getting all properties count: $e");
+      return 0;
+    }
+  }
+
+  /// --- GET PROPERTIES COUNT BY STATUS (Admin Function) ---
+  /// Fetches the number of properties with a specific status.
+  Future<int> getPropertiesCountByStatus(String status) async {
+    try {
+      final response = await supabase
+          .from('properties')
+          .select('count')
+          .eq('status', status)
+          .single(); // Use .single() to get the count directly
+
+      return response['count'] as int;
+    } catch (e) {
+      debugPrint("Error getting properties count by status '$status': $e");
+      return 0;
+    }
+  }
 
   // ========== CHAT FUNCTIONS (Day 6) ==========
 
