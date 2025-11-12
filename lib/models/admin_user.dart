@@ -9,6 +9,7 @@ class AdminUser {
   final String? middleName;
   final String? userName;
   final String? phoneNumber;
+  final String? profilePictureUrl; // New: Nullable field for profile picture URL
 
   AdminUser({
     required this.id,
@@ -19,6 +20,7 @@ class AdminUser {
     this.middleName,
     this.userName,
     this.phoneNumber,
+    this.profilePictureUrl, // New: Add to constructor
   });
 
   factory AdminUser.fromJson(Map<String, dynamic> json) {
@@ -31,6 +33,7 @@ class AdminUser {
       middleName: json['middle_name'] as String?,
       userName: json['user_name'] as String?,
       phoneNumber: json['phone_number'] as String?,
+      profilePictureUrl: json['profile_picture_url'] as String?, // New: Parse profile picture URL
     );
   }
 }

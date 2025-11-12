@@ -9,6 +9,7 @@ class AppUser {
   final String? middleName; // Nullable
   final String userName;
   final String phoneNumber;
+  final String? profilePictureUrl; // New: Nullable field for profile picture URL
 
   AppUser({
     required this.id,
@@ -19,6 +20,7 @@ class AppUser {
     this.middleName,
     required this.userName,
     required this.phoneNumber,
+    this.profilePictureUrl, // New: Add to constructor
   });
 
   // Factory constructor to create an AppUser from a JSON map (e.g., from Supabase)
@@ -32,6 +34,7 @@ class AppUser {
       middleName: json['middle_name'], // Supabase returns null if not present
       userName: json['user_name'],
       phoneNumber: json['phone_number'],
+      profilePictureUrl: json['profile_picture_url'], // New: Parse profile picture URL
     );
   }
 }

@@ -7,6 +7,9 @@ import 'package:odiorent/services/database_service.dart';
 import 'package:odiorent/screens/shared/welcome_screen.dart';
 import 'package:odiorent/widgets/property_card.dart';
 import 'package:odiorent/screens/renter/property_details_screen.dart';
+import 'package:odiorent/screens/renter/renter_edit_profile_screen.dart'; // New import
+import 'package:odiorent/screens/admin/admin_change_password_screen.dart'; // Reusing AdminChangePasswordScreen
+import 'package:odiorent/models/user.dart'; // New import for AppUser
 
 class RenterHomeScreen extends StatefulWidget {
   const RenterHomeScreen({super.key});
@@ -38,6 +41,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   bool _isSearching = false;
 
   // User data
+  AppUser? _appUser; // New: To hold the full AppUser profile
   String _userName = 'Renter';
   String? _userProfileImage;
   DateTime? lastPressed; // For double-tap to exit
@@ -60,9 +64,19 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   Future<void> _loadUserData() async {
     final user = _authService.getCurrentUser();
     if (user != null) {
-      setState(() {
-        _userName = user.email?.split('@')[0] ?? 'Renter';
-      });
+      final appUser = await _authService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _appUser = appUser;
+          String resolvedUserName = 'Renter'; // Default if _appUser is null
+          if (_appUser != null) {
+            final nonNullAppUser = _appUser!; // Explicitly assert non-null
+            resolvedUserName = nonNullAppUser.userName;
+          }
+          _userName = resolvedUserName;
+          _userProfileImage = _appUser?.profilePictureUrl;
+        });
+      }
     }
   }
 
@@ -438,7 +452,20 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
               const SizedBox(height: 30),
               // Profile Picture
               GestureDetector(
-                onTap: _showProfileDialog,
+                onTap: () async {
+                  if (_appUser != null) {
+                    final bool? didUpdate = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => RenterEditProfileScreen(appUser: _appUser!),
+                      ),
+                    );
+                    if (didUpdate == true) {
+                      _loadUserData(); // Refresh profile after edit
+                    }
+                  } else {
+                    Fluttertoast.showToast(msg: "User data not loaded yet.");
+                  }
+                },
                 child: Container(
                   width: 120,
                   height: 120,
@@ -474,7 +501,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                _authService.getCurrentUser()?.email ?? '',
+                _appUser?.email ?? '',
                 style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               ),
               const SizedBox(height: 30),
@@ -483,14 +510,30 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
               _buildSettingsTile(
                 icon: Icons.person_outline,
                 title: 'Edit Profile',
-                onTap: _showProfileDialog,
+                onTap: () async {
+                  if (_appUser != null) {
+                    final bool? didUpdate = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => RenterEditProfileScreen(appUser: _appUser!),
+                      ),
+                    );
+                    if (didUpdate == true) {
+                      _loadUserData(); // Refresh profile after edit
+                    }
+                  } else {
+                    Fluttertoast.showToast(msg: "User data not loaded yet.");
+                  }
+                },
               ),
               _buildSettingsTile(
                 icon: Icons.lock_outline,
                 title: 'Change Password',
                 onTap: () {
-                  // TODO: Implement change password
-                  _showComingSoonDialog('Change Password');
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AdminChangePasswordScreen(), // Reusing AdminChangePasswordScreen
+                    ),
+                  );
                 },
               ),
               _buildSettingsTile(
@@ -498,7 +541,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                 title: 'Favorites',
                 onTap: () {
                   // TODO: Implement favorites
-                  _showComingSoonDialog('Favorites');
+                  Fluttertoast.showToast(msg: "Favorites feature coming soon!");
                 },
               ),
               _buildSettingsTile(
@@ -506,7 +549,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                 title: 'Help & Support',
                 onTap: () {
                   // TODO: Implement help
-                  _showComingSoonDialog('Help & Support');
+                  Fluttertoast.showToast(msg: "Help & Support feature coming soon!");
                 },
               ),
               _buildSettingsTile(
@@ -605,54 +648,6 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // Profile Dialog
-  void _showProfileDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Profile Picture'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Profile picture upload feature coming soon!',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'This is required for security purposes.',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            child: const Text('OK'),
-            onPressed: () => Navigator.of(ctx).pop(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Coming Soon Dialog
-  void _showComingSoonDialog(String feature) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(feature),
-        content: Text('$feature feature coming soon!'),
-        actions: [
-          TextButton(
-            child: const Text('OK'),
-            onPressed: () => Navigator.of(ctx).pop(),
-          ),
-        ],
       ),
     );
   }

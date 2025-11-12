@@ -61,9 +61,6 @@ class _LoginScreenState extends State<LoginScreen> {
         debugPrint("=== USERNAME LOGIN DETECTED ===");
         debugPrint("Username provided: $input");
 
-        // Debug: Print all profiles to see what's in the database
-        await authService.debugPrintAllProfiles();
-
         emailToUse = await authService.getEmailByUsername(input);
 
         if (emailToUse == null || emailToUse.isEmpty) {

@@ -144,134 +144,135 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         backgroundColor: lightGreen,
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTextField(
-                controller: _nameController,
-                labelText: 'Property Name (e.g., "Cozy 2-Bedroom Condo")',
-                prefixIcon: Icons.home,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _addressController,
-                labelText: 'Address',
-                prefixIcon: Icons.location_on,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _descriptionController,
-                labelText: 'Description',
-                prefixIcon: Icons.description,
-                maxLines: 4,
-              ),
-              const SizedBox(height: 16),
-              Row(
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 100.0), // Added bottom padding
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _priceController,
-                      labelText: 'Price (₱)',
-                      prefixIcon: Icons.attach_money,
-                      keyboardType: TextInputType.number,
-                    ),
+                  _buildTextField(
+                    controller: _nameController,
+                    labelText: 'Property Name (e.g., "Cozy 2-Bedroom Condo")',
+                    prefixIcon: Icons.home,
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _roomsController,
-                      labelText: 'Rooms',
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _addressController,
+                    labelText: 'Address',
+                    prefixIcon: Icons.location_on,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _descriptionController,
+                    labelText: 'Description',
+                    prefixIcon: Icons.description,
+                    maxLines: 4,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _priceController,
+                    labelText: 'Price (₱)',
+                    prefixIcon: Icons.attach_money,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _roomsController,
+                    labelText: 'Rooms',
+                    prefixIcon: Icons.meeting_room,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _bedsController,
+                    labelText: 'Beds',
+                    prefixIcon: Icons.bed,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 24),
 
-                      prefixIcon: Icons.meeting_room,
-                      keyboardType: TextInputType.number,
-                    ),
+                  // --- Image Upload Section ---
+                  const Text(
+                    'Property Images',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _bedsController,
-                      labelText: 'Beds',
-                      prefixIcon: Icons.bed,
-                      keyboardType: TextInputType.number,
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryGreen,
+                      side: const BorderSide(color: primaryGreen),
                     ),
+                    onPressed: _pickImages,
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Select Images'),
                   ),
+                  const SizedBox(height: 16),
+                  // --- Image Preview Grid ---
+                  if (_selectedImages.isNotEmpty)
+                    SizedBox(
+                      height: 100,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _selectedImages.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.file(
+                                    _selectedImages[index],
+                                    width: 100,
+                                    height: 100,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                // --- Remove Image Button ---
+                                Positioned(
+                                  top: -4,
+                                  right: -4,
+                                  child: CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor: Colors.black54,
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      iconSize: 16,
+                                      icon: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _selectedImages.removeAt(index);
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 32),
                 ],
               ),
-              const SizedBox(height: 24),
-
-              // --- Image Upload Section ---
-              const Text(
-                'Property Images',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: primaryGreen,
-                  side: const BorderSide(color: primaryGreen),
-                ),
-                onPressed: _pickImages,
-                icon: const Icon(Icons.upload_file),
-                label: const Text('Select Images'),
-              ),
-              const SizedBox(height: 16),
-              // --- Image Preview Grid ---
-              if (_selectedImages.isNotEmpty)
-                SizedBox(
-                  height: 100,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _selectedImages.length,
-                    itemBuilder: (context, index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.file(
-                                _selectedImages[index],
-                                width: 100,
-                                height: 100,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            // --- Remove Image Button ---
-                            Positioned(
-                              top: -4,
-                              right: -4,
-                              child: CircleAvatar(
-                                radius: 12,
-                                backgroundColor: Colors.black54,
-                                child: IconButton(
-                                  padding: EdgeInsets.zero,
-                                  iconSize: 16,
-                                  icon: const Icon(
-                                    Icons.close,
-                                    color: Colors.white,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _selectedImages.removeAt(index);
-                                    });
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              const SizedBox(height: 32),
-
-              // --- Submit Button ---
-              _isLoading
+            ),
+          ),
+          // --- Submit Button (Fixed at bottom) ---
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              color: Theme.of(context).scaffoldBackgroundColor, // Match scaffold background
+              child: _isLoading
                   ? const Center(
                       child: CircularProgressIndicator(color: primaryGreen),
                     )
@@ -280,9 +281,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                       onPressed: _handleCreateProperty,
                       backgroundColor: primaryGreen,
                     ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -68,4 +68,42 @@ class StorageService {
         return 'image/jpeg'; // Default to jpeg
     }
   }
+
+  /// --- UPLOAD PROFILE PICTURE ---
+  /// Uploads a profile picture to the 'profile_pictures' bucket.
+  ///
+  /// Takes a [File] and a [userId].
+  /// Returns the public URL of the uploaded image.
+  Future<String> uploadProfilePicture(File file, String userId) async {
+    try {
+      final String fileExtension = file.path.split('.').last;
+      // Use a consistent file name for profile pictures to allow easy replacement
+      final String fileName = 'profile_pic.$fileExtension';
+      final String filePath = 'public/$userId/$fileName';
+
+      final bytes = await file.readAsBytes();
+
+      await supabase.storage
+          .from('profile_pictures') // Use a dedicated bucket for profile pictures
+          .uploadBinary(
+            filePath,
+            bytes,
+            fileOptions: FileOptions(
+              cacheControl: '3600',
+              upsert: true, // Allow overwriting existing profile pictures
+              contentType: _getContentType(fileExtension),
+            ),
+          );
+
+      final String publicUrl = supabase.storage
+          .from('profile_pictures')
+          .getPublicUrl(filePath);
+
+      debugPrint("Profile picture uploaded successfully: $publicUrl");
+      return publicUrl;
+    } catch (e) {
+      debugPrint("Error uploading profile picture: $e");
+      rethrow;
+    }
+  }
 }

@@ -277,13 +277,6 @@ class AuthService {
   /// Returns null if username not found.
   Future<String?> getEmailByUsername(String username) async {
     try {
-      if (kDebugMode) {
-        debugPrint("=== GET EMAIL BY USERNAME DEBUG ===");
-      }
-      if (kDebugMode) {
-        debugPrint("Searching for username: '$username'");
-      }
-
       // First, let's check if the user exists at all
       final userCheckResponse = await supabase
           .from('profiles')
@@ -291,60 +284,16 @@ class AuthService {
           .eq('user_name', username)
           .maybeSingle();
 
-      if (kDebugMode) {
-        debugPrint("Full query response: $userCheckResponse");
-      }
-
       if (userCheckResponse == null) {
-        if (kDebugMode) {
-          debugPrint("❌ No user found with username: '$username'");
-        }
-        if (kDebugMode) {
-          debugPrint(
-            "   This means the username doesn't exist in the profiles table",
-          );
-        }
         return null;
-      }
-
-      if (kDebugMode) {
-        debugPrint("✅ User found in profiles table:");
-      }
-      if (kDebugMode) {
-        debugPrint("   - ID: ${userCheckResponse['id']}");
-      }
-      if (kDebugMode) {
-        debugPrint("   - Username: ${userCheckResponse['user_name']}");
-      }
-      if (kDebugMode) {
-        debugPrint("   - Email: ${userCheckResponse['email']}");
       }
 
       final email = userCheckResponse['email'] as String?;
 
       if (email == null || email.isEmpty) {
-        if (kDebugMode) {
-          debugPrint("⚠️  User exists but email field is NULL or empty!");
-        }
-        if (kDebugMode) {
-          debugPrint(
-            "   This user was created before the email field was added to signup.",
-          );
-        }
-        if (kDebugMode) {
-          debugPrint(
-            "   You need to manually update this user's email in the database.",
-          );
-        }
         return null;
       }
 
-      if (kDebugMode) {
-        debugPrint("✅ Found email for username '$username': $email");
-      }
-      if (kDebugMode) {
-        debugPrint("=== END DEBUG ===");
-      }
       return email;
     } catch (e) {
       if (kDebugMode) {

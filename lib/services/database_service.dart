@@ -146,15 +146,24 @@ class DatabaseService {
     required String firstName,
     String? middleName,
     required String lastName,
-    required String phoneNumber, // New parameter
+    required String phoneNumber,
+    String? userName, // New optional parameter
+    String? profilePictureUrl, // New optional parameter
   }) async {
     try {
       final Map<String, dynamic> updates = {
         'first_name': firstName,
         'last_name': lastName,
-        'middle_name': middleName, // Will be null if not provided
-        'phone_number': phoneNumber, // Update phone number
+        'middle_name': middleName,
+        'phone_number': phoneNumber,
       };
+
+      if (userName != null) {
+        updates['user_name'] = userName;
+      }
+      if (profilePictureUrl != null) {
+        updates['profile_picture_url'] = profilePictureUrl;
+      }
 
       await supabase.from('profiles').update(updates).eq('id', userId);
     } catch (e) {
