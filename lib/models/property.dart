@@ -23,6 +23,10 @@ class Property {
   // New: Landlord details (will be populated via joins in queries)
   final String? landlordName;
   final String? landlordEmail;
+  final String? landlordFirstName;
+  final String? landlordLastName;
+  final String? landlordUsername;
+  final String? landlordPhoneNumber;
 
   // --- Constructor ---
   Property({
@@ -40,6 +44,10 @@ class Property {
     this.approvedAt, // New (nullable)
     this.landlordName, // New (nullable)
     this.landlordEmail, // New (nullable)
+    this.landlordFirstName,
+    this.landlordLastName,
+    this.landlordUsername,
+    this.landlordPhoneNumber,
   });
 
   /// --- `toJson` Method ---
@@ -66,7 +74,8 @@ class Property {
   /// --- `fromJson` Factory ---
   /// Creates a Property object *from* a Map (JSON) received from Supabase.
   /// This is used for reading properties from the database.
-  factory Property.fromJson(Map<String, dynamic> json) {
+  factory Property.fromMap(Map<String, dynamic> json) {
+    final profile = json['profiles'] as Map<String, dynamic>?;
     return Property(
       id: json['id'] as String?,
       landlordId: json['landlord_id'] as String,
@@ -87,8 +96,12 @@ class Property {
           ? DateTime.parse(json['approved_at'] as String)
           : null, // Parse approved_at if not null
       // Populate landlord details if available from a join
-      landlordName: json['profiles']?['user_name'] as String?,
-      landlordEmail: json['profiles']?['email'] as String?,
+      landlordName: profile?['user_name'] as String?,
+      landlordEmail: profile?['email'] as String?,
+      landlordFirstName: profile?['first_name'] as String?,
+      landlordLastName: profile?['last_name'] as String?,
+      landlordUsername: profile?['user_name'] as String?,
+      landlordPhoneNumber: profile?['phone_number'] as String?,
     );
   }
 }

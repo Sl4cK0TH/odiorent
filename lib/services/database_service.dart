@@ -12,7 +12,13 @@ class DatabaseService {
   // Helper query string for selecting properties with joined landlord details
   static const String _propertySelectQuery = '''
     *,
-    profiles!landlord_id(user_name, email)
+    profiles!landlord_id(
+      first_name,
+      last_name,
+      user_name,
+      email,
+      phone_number
+    )
   ''';
 
   /// --- CREATE PROPERTY (Day 3 Task) ---
@@ -88,7 +94,7 @@ class DatabaseService {
           .eq('landlord_id', landlordId);
 
       final properties = (response as List<dynamic>)
-          .map((json) => Property.fromJson(json as Map<String, dynamic>))
+          .map((json) => Property.fromMap(json as Map<String, dynamic>))
           .toList();
 
       return properties;
@@ -110,7 +116,7 @@ class DatabaseService {
           .order('created_at', ascending: false);
 
       final properties = (response as List<dynamic>)
-          .map((json) => Property.fromJson(json as Map<String, dynamic>))
+          .map((json) => Property.fromMap(json as Map<String, dynamic>))
           .toList();
 
       debugPrint("Fetched ${properties.length} pending properties");
@@ -130,7 +136,7 @@ class DatabaseService {
           .order('created_at', ascending: false);
 
       final properties = (response as List<dynamic>)
-          .map((json) => Property.fromJson(json as Map<String, dynamic>))
+          .map((json) => Property.fromMap(json as Map<String, dynamic>))
           .toList();
 
       debugPrint("Fetched ${properties.length} overall properties with landlord details");
@@ -152,7 +158,7 @@ class DatabaseService {
           .order('created_at', ascending: false);
 
       final properties = (response as List<dynamic>)
-          .map((json) => Property.fromJson(json as Map<String, dynamic>))
+          .map((json) => Property.fromMap(json as Map<String, dynamic>))
           .toList();
 
       debugPrint("Fetched ${properties.length} $status properties with landlord details");
@@ -235,6 +241,32 @@ class DatabaseService {
     }
   }
 
+  /// --- GET PROPERTY WITH LANDLORD DETAILS (Renter Function) ---
+  Future<Map<String, dynamic>> getPropertyWithLandlordDetails(String propertyId) async {
+    try {
+      final response = await supabase
+          .from('properties')
+          .select('''
+            *,
+            profiles!landlord_id (
+              first_name,
+              last_name,
+              user_name,
+              email,
+              phone_number
+            )
+          ''')
+          .eq('id', propertyId)
+          .single();
+
+      debugPrint("Supabase response for property details: $response"); // Debugging line
+      return response;
+    } catch (e) {
+      debugPrint("Error getting property with landlord details: $e");
+      rethrow;
+    }
+  }
+
   /// --- GET APPROVED PROPERTIES (Day 5 Task) ---
   /// Fetches all properties with 'approved' status for renters to browse.
   ///
@@ -250,7 +282,7 @@ class DatabaseService {
 
       // Convert the response to a list of Property objects
       final properties = (response as List<dynamic>)
-          .map((json) => Property.fromJson(json as Map<String, dynamic>))
+          .map((json) => Property.fromMap(json as Map<String, dynamic>))
           .toList();
 
       debugPrint("Fetched ${properties.length} approved properties");

@@ -23,7 +23,7 @@ class AdminUser {
     this.profilePictureUrl, // New: Add to constructor
   });
 
-  factory AdminUser.fromJson(Map<String, dynamic> json) {
+  factory AdminUser.fromMap(Map<String, dynamic> json) {
     return AdminUser(
       id: json['id'] as String,
       email: json['email'] as String,

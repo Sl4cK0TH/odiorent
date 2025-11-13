@@ -216,7 +216,7 @@ class AuthService {
           .eq('id', user.id)
           .single();
 
-      return AdminUser.fromJson(response);
+      return AdminUser.fromMap(response);
     } catch (e) {
       if (kDebugMode) {
         debugPrint("Error getting current admin user profile: $e");

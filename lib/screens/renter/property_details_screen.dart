@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/auth_service.dart';
 import 'package:odiorent/services/database_service.dart';
-import 'package:odiorent/widgets/custom_button.dart';
 import 'package:odiorent/screens/shared/chat_room_screen.dart';
 
 class PropertyDetailsScreen extends StatefulWidget {
@@ -21,19 +20,37 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
 
   final DatabaseService _dbService = DatabaseService();
   final AuthService _authService = AuthService();
-  bool _isLoading = false;
+
+  late Property _property;
+  bool _isMessageLoading = false;
+  bool _isFetchingDetails = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _property = widget.property;
+    _fetchPropertyDetails();
+  }
+
+  void _handleBookNow() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Booking flow coming soon!'),
+      ),
+    );
+  }
 
   /// --- Day 6: Message Landlord ---
   /// This function will handle the logic for starting a chat.
   void _handleMessageLandlord() async {
-    setState(() => _isLoading = true);
+    setState(() => _isMessageLoading = true);
 
     try {
       // 1. Get current renter's ID
       final renterId = _authService.getCurrentUser()?.id;
       if (renterId == null) {
         // Handle user not found
-        setState(() => _isLoading = false);
+        setState(() => _isMessageLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -46,16 +63,16 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
       }
 
       // 2. Get the landlord's ID from the property
-      final landlordId = widget.property.landlordId;
+      final landlordId = _property.landlordId;
 
       // 3. Call the database service function to get or create chat
       final chatId = await _dbService.getOrCreateChat(
         renterId: renterId,
         landlordId: landlordId,
-        propertyId: widget.property.id!,
+        propertyId: _property.id!,
       );
 
-      setState(() => _isLoading = false);
+      setState(() => _isMessageLoading = false);
 
       // 4. Navigate to the chat room
       if (mounted) {
@@ -63,14 +80,14 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
           MaterialPageRoute(
             builder: (context) => ChatRoomScreen(
               chatId: chatId,
-              propertyName: widget.property.name,
+              propertyName: _property.name,
               otherUserEmail: 'Landlord',
             ),
           ),
         );
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      setState(() => _isMessageLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -82,32 +99,57 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
     }
   }
 
+  Future<void> _fetchPropertyDetails() async {
+    final propertyId = widget.property.id;
+    if (propertyId == null) {
+      return;
+    }
+    setState(() => _isFetchingDetails = true);
+    try {
+      final response = await _dbService.getPropertyWithLandlordDetails(propertyId);
+      final detailedProperty = Property.fromMap(response);
+      if (!mounted) return;
+      setState(() {
+        _property = detailedProperty;
+        _isFetchingDetails = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetching property details: $e');
+      if (mounted) {
+        setState(() => _isFetchingDetails = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final property = _property;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.property.name),
+        title: Text(property.name),
         backgroundColor: lightGreen,
         foregroundColor: Colors.white,
       ),
       // --- Sticky Bottom Button ---
       // We use bottomNavigationBar to make the button
       // "stick" to the bottom, even when the content scrolls.
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withAlpha(51),
-              spreadRadius: 2,
-              blurRadius: 5,
-            ),
-          ],
-        ),
-        child: _isLoading
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.only(bottom: 12.0),
+        child: Container(
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withAlpha(51),
+                spreadRadius: 2,
+                blurRadius: 5,
+              ),
+            ],
+          ),
+        child: _isMessageLoading
             ? const Center(
-                heightFactor: 1.0, // Keep the container size
+                heightFactor: 1.0,
                 child: SizedBox(
                   width: 24,
                   height: 24,
@@ -117,11 +159,43 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                   ),
                 ),
               )
-            : CustomButton(
-                text: "Message Landlord",
-                onPressed: _handleMessageLandlord,
-                backgroundColor: primaryGreen,
+            : Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.message_outlined),
+                      label: const Text('Message Landlord'),
+                      onPressed: _handleMessageLandlord,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.calendar_today_outlined),
+                      label: const Text('Book Now'),
+                      onPressed: _handleBookNow,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: primaryGreen,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          side: const BorderSide(color: primaryGreen),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -131,12 +205,12 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
             SizedBox(
               height: 250,
               child: PageView.builder(
-                itemCount: widget.property.imageUrls.length,
+                itemCount: property.imageUrls.length,
                 itemBuilder: (context, index) {
                   // Use a ternary to handle empty image lists
-                  return widget.property.imageUrls.isNotEmpty
+                  return property.imageUrls.isNotEmpty
                       ? Image.network(
-                          widget.property.imageUrls[index],
+                          property.imageUrls[index],
                           fit: BoxFit.cover,
                           // Show a loading spinner while the image loads
                           loadingBuilder: (context, child, loadingProgress) {
@@ -181,7 +255,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                   // --- Price ---
                   Text(
                     // Format price to 2 decimal places
-                    '₱${widget.property.price.toStringAsFixed(2)} / month',
+                    '₱${property.price.toStringAsFixed(2)} / month',
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -192,7 +266,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
 
                   // --- Name ---
                   Text(
-                    widget.property.name,
+                    property.name,
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w600,
@@ -211,7 +285,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          widget.property.address,
+                          property.address,
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[600],
@@ -228,12 +302,12 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                     children: [
                       _buildStatChip(
                         Icons.bed_outlined,
-                        '${widget.property.beds} Beds',
+                        '${property.beds} Beds',
                       ),
                       const SizedBox(width: 12),
                       _buildStatChip(
                         Icons.meeting_room_outlined,
-                        '${widget.property.rooms} Rooms',
+                        '${property.rooms} Rooms',
                       ),
                     ],
                   ),
@@ -246,9 +320,33 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                   ),
                   const Divider(thickness: 0.5, height: 20),
                   Text(
-                    widget.property.description,
+                    property.description,
                     style: const TextStyle(fontSize: 16, height: 1.5),
                   ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Landlord Information',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const Divider(thickness: 0.5, height: 20),
+                  _buildInfoRow(
+                    'Full Name',
+                    _formatFullName(property),
+                  ),
+                  _buildInfoRow(
+                    'Email',
+                    property.landlordEmail ?? 'N/A',
+                  ),
+                  _buildInfoRow(
+                    'Contact Number',
+                    property.landlordPhoneNumber ?? 'N/A',
+                  ),
+                  if (_isFetchingDetails)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12.0),
+                      child: LinearProgressIndicator(),
+                    ),
+                  // TODO: Add landlord profile picture later
                 ],
               ),
             ),
@@ -269,5 +367,48 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
         side: BorderSide(color: primaryGreen.withAlpha(77)),
       ),
     );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatFullName(Property property) {
+    final parts = <String>[];
+    final firstName = property.landlordFirstName?.trim();
+    final lastName = property.landlordLastName?.trim();
+    if (firstName != null && firstName.isNotEmpty) {
+      parts.add(firstName);
+    }
+    if (lastName != null && lastName.isNotEmpty) {
+      parts.add(lastName);
+    }
+    if (parts.isEmpty) {
+      return 'N/A';
+    }
+    return parts.join(' ');
   }
 }

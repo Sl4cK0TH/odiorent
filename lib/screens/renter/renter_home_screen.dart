@@ -7,9 +7,11 @@ import 'package:odiorent/services/database_service.dart';
 import 'package:odiorent/screens/shared/welcome_screen.dart';
 import 'package:odiorent/widgets/property_card.dart';
 import 'package:odiorent/screens/renter/property_details_screen.dart';
-import 'package:odiorent/screens/renter/renter_edit_profile_screen.dart'; // New import
-import 'package:odiorent/screens/admin/admin_change_password_screen.dart'; // Reusing AdminChangePasswordScreen
-import 'package:odiorent/models/admin_user.dart'; // New import for AdminUser
+import 'package:odiorent/screens/renter/renter_edit_profile_screen.dart';
+import 'package:odiorent/screens/admin/admin_change_password_screen.dart';
+import 'package:odiorent/models/admin_user.dart';
+import 'package:odiorent/screens/shared/notifications_screen.dart';
+import 'package:odiorent/screens/renter/messages_screen.dart';
 
 class RenterHomeScreen extends StatefulWidget {
   const RenterHomeScreen({super.key});
@@ -30,18 +32,15 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   final DatabaseService _dbService = DatabaseService();
   final AuthService _authService = AuthService();
 
-  // A Future to hold the list of approved properties
-  late Future<List<Property>> _propertiesFuture;
+  // Properties
   List<Property> _allProperties = [];
   List<Property> _filteredProperties = [];
 
   // Search
   final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode(); // For search auto-focus
-  bool _isSearching = false;
 
   // User data
-  AdminUser? _appUser; // New: To hold the full AdminUser profile
+  AdminUser? _appUser;
   String _userName = 'Renter';
   String? _userProfileImage;
   DateTime? lastPressed; // For double-tap to exit
@@ -51,12 +50,14 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
     super.initState();
     _loadUserData();
     _refreshProperties();
+    _searchController.addListener(() {
+      _searchProperties(_searchController.text);
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _searchFocusNode.dispose(); // Dispose the focus node
     super.dispose();
   }
 
@@ -64,26 +65,31 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   Future<void> _loadUserData() async {
     final user = _authService.getCurrentUser();
     if (user != null) {
-      final appUser = await _authService.getAdminUserProfile(); // Call getAdminUserProfile
+      final appUser = await _authService.getAdminUserProfile();
       if (mounted) {
         setState(() {
           _appUser = appUser;
-          String resolvedUserName = 'Renter'; // Default if _appUser is null
+          String resolvedUserName = 'Renter';
           if (_appUser != null) {
-            final nonNullAppUser = _appUser!; // Explicitly assert non-null
-            resolvedUserName = nonNullAppUser.userName ?? 'Renter'; // Handle nullability
+            final nonNullAppUser = _appUser!;
+            resolvedUserName = nonNullAppUser.userName ?? 'Renter';
           }
           _userName = resolvedUserName;
-          _userProfileImage = _appUser?.profilePictureUrl;
+          _userProfileImage = appUser?.profilePictureUrl != null
+              ? '${appUser!.profilePictureUrl}?t=${DateTime.now().millisecondsSinceEpoch}'
+              : null;
         });
       }
     }
   }
 
   // Function to refresh the list
-  void _refreshProperties() {
+  Future<void> _refreshProperties() async {
+    final properties = await _dbService.getApprovedProperties();
     setState(() {
-      _propertiesFuture = _dbService.getApprovedProperties();
+      _allProperties = properties;
+      _filteredProperties = properties;
+      _searchController.clear();
     });
   }
 
@@ -91,27 +97,15 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-      if (index != 1) {
-        _isSearching = false;
-        _searchController.clear();
-        _searchFocusNode.unfocus(); // Unfocus when leaving search tab
-      } else {
-        // Request focus when search tab is selected
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _searchFocusNode.requestFocus();
-        });
-      }
     });
   }
 
   // Search properties
   void _searchProperties(String query) {
-    if (query.isEmpty) {
-      setState(() {
+    setState(() {
+      if (query.isEmpty) {
         _filteredProperties = _allProperties;
-      });
-    } else {
-      setState(() {
+      } else {
         _filteredProperties = _allProperties.where((property) {
           final nameLower = property.name.toLowerCase();
           final addressLower = property.address.toLowerCase();
@@ -119,8 +113,8 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
           return nameLower.contains(searchLower) ||
               addressLower.contains(searchLower);
         }).toList();
-      });
-    }
+      }
+    });
   }
 
   @override
@@ -131,14 +125,12 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
         if (didPop) {
           return;
         }
-        // If the user is not on the Home tab, navigate to it.
         if (_selectedIndex != 0) {
           setState(() {
             _selectedIndex = 0;
           });
           return;
         }
-        // If on the Home tab, proceed with double-tap-to-exit logic.
         final now = DateTime.now();
         const maxDuration = Duration(seconds: 2);
         final isWarning =
@@ -163,8 +155,8 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
           index: _selectedIndex,
           children: [
             _buildHomeTab(),
-            _buildSearchTab(),
-            _buildNotificationsTab(), // This is now a placeholder tab
+            const MessagesScreen(),
+            const NotificationsScreen(),
             _buildAccountTab(),
           ],
         ),
@@ -175,157 +167,31 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
 
   // Home Tab - Property List
   Widget _buildHomeTab() {
-    return CustomScrollView(
-      slivers: [
-        // Custom App Bar with User Profile
-        SliverAppBar(
-          automaticallyImplyLeading: false,
-          expandedHeight: 80,
-          floating: false,
-          pinned: true,
-          backgroundColor: lightGreen,
-          title: const Text(
-            'OdioRent',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 24,
-            ),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(
-                Icons.notifications_outlined,
-                color: Colors.white,
-              ),
-              onPressed: () => _onItemTapped(2), // Index 2 is Notifications
-            ),
-            IconButton(
-              icon: const Icon(Icons.message_outlined, color: Colors.white),
-              onPressed: () {
-                // TODO: Navigate to a messages/chat list screen
-                Fluttertoast.showToast(msg: "Messages screen coming soon!");
-              },
-            ),
-          ],
-        ),
-
-        // Section Title
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Available Properties',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-            ),
-          ),
-        ),
-
-        // Properties FutureBuilder
-        FutureBuilder<List<Property>>(
-          future: _propertiesFuture,
-          builder: (context, snapshot) {
-            // --- Loading State ---
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const SliverFillRemaining(
-                child: Center(
-                  child: CircularProgressIndicator(color: primaryGreen),
-                ),
-              );
-            }
-
-            // --- Error State ---
-            if (snapshot.hasError) {
-              return SliverFillRemaining(
-                child: Center(child: Text("Error: ${snapshot.error}")),
-              );
-            }
-
-            // --- Empty State ---
-            final properties = snapshot.data;
-            if (properties == null || properties.isEmpty) {
-              return SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.home_outlined,
-                        size: 80,
-                        color: Colors.grey[300],
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        "No properties available right now.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        "Check back later for new listings!",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 14, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            // Update all properties for search
-            _allProperties = properties;
-            if (_filteredProperties.isEmpty && !_isSearching) {
-              _filteredProperties = properties;
-            }
-
-            // --- Success State (Show List) ---
-            return SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final property = properties[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
-                  ),
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              PropertyDetailsScreen(property: property),
-                        ),
-                      );
-                    },
-                    child: PropertyCard(property: property),
-                  ),
-                );
-              }, childCount: properties.length),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  // Search Tab
-  Widget _buildSearchTab() {
-    return SafeArea(
+    return RefreshIndicator(
+      onRefresh: _refreshProperties,
+      color: primaryGreen,
       child: CustomScrollView(
         slivers: [
+          SliverAppBar(
+            automaticallyImplyLeading: false,
+            pinned: true,
+            backgroundColor: lightGreen,
+            title: const Text(
+              'OdioRent',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 24,
+              ),
+            ),
+          ),
+
+          // Search Box
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
               child: TextField(
-                focusNode: _searchFocusNode,
                 controller: _searchController,
-                onChanged: (value) {
-                  _isSearching = true;
-                  _searchProperties(value);
-                },
                 decoration: InputDecoration(
                   hintText: 'Search by name or location...',
                   prefixIcon: const Icon(Icons.search, color: primaryGreen),
@@ -334,7 +200,6 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                           icon: const Icon(Icons.clear),
                           onPressed: () {
                             _searchController.clear();
-                            _searchProperties('');
                           },
                         )
                       : null,
@@ -350,19 +215,43 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
               ),
             ),
           ),
+
+          // Section Title
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16.0, 24.0, 16.0, 8.0),
+              child: Text(
+                'Available Properties',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ),
+          ),
+
+          // Properties List
           _filteredProperties.isEmpty
               ? SliverFillRemaining(
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.search_off, size: 80, color: Colors.grey[300]),
+                        Icon(
+                          _searchController.text.isEmpty
+                              ? Icons.home_outlined
+                              : Icons.search_off,
+                          size: 80,
+                          color: Colors.grey[300],
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           _searchController.text.isEmpty
-                              ? 'Start searching for properties'
-                              : 'No properties found',
-                          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                              ? "No properties available right now."
+                              : "No properties found for your search.",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                       ],
                     ),
@@ -395,46 +284,6 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
     );
   }
 
-  // Notifications Tab
-  Widget _buildNotificationsTab() {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          automaticallyImplyLeading: false,
-          pinned: true,
-          backgroundColor: lightGreen,
-          title: const Text('Notifications'),
-          foregroundColor: Colors.white,
-        ),
-        SliverFillRemaining(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.notifications_none,
-                  size: 80,
-                  color: Colors.grey[300],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No notifications yet',
-                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'You\'ll see updates about your inquiries here',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   // Account Settings Tab
   Widget _buildAccountTab() {
     return CustomScrollView(
@@ -450,7 +299,6 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
           child: Column(
             children: [
               const SizedBox(height: 30),
-              // Profile Picture
               GestureDetector(
                 onTap: () async {
                   if (_appUser != null) {
@@ -460,7 +308,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                       ),
                     );
                     if (didUpdate == true) {
-                      _loadUserData(); // Refresh profile after edit
+                      _loadUserData();
                     }
                   } else {
                     Fluttertoast.showToast(msg: "User data not loaded yet.");
@@ -486,6 +334,8 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                           child: Image.network(
                             _userProfileImage!,
                             fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.person, size: 60, color: primaryGreen),
                           ),
                         )
                       : const Icon(Icons.person, size: 60, color: primaryGreen),
@@ -505,8 +355,6 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                 style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               ),
               const SizedBox(height: 30),
-
-              // Settings List
               _buildSettingsTile(
                 icon: Icons.person_outline,
                 title: 'Edit Profile',
@@ -518,7 +366,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                       ),
                     );
                     if (didUpdate == true) {
-                      _loadUserData(); // Refresh profile after edit
+                      _loadUserData();
                     }
                   } else {
                     Fluttertoast.showToast(msg: "User data not loaded yet.");
@@ -531,7 +379,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => const AdminChangePasswordScreen(), // Reusing AdminChangePasswordScreen
+                      builder: (context) => const AdminChangePasswordScreen(),
                     ),
                   );
                 },
@@ -540,7 +388,6 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                 icon: Icons.favorite_border,
                 title: 'Favorites',
                 onTap: () {
-                  // TODO: Implement favorites
                   Fluttertoast.showToast(msg: "Favorites feature coming soon!");
                 },
               ),
@@ -548,7 +395,6 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                 icon: Icons.help_outline,
                 title: 'Help & Support',
                 onTap: () {
-                  // TODO: Implement help
                   Fluttertoast.showToast(msg: "Help & Support feature coming soon!");
                 },
               ),
@@ -565,7 +411,6 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
     );
   }
 
-  // Settings Tile Widget
   Widget _buildSettingsTile({
     required IconData icon,
     required String title,
@@ -586,47 +431,49 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
     );
   }
 
-  // Bottom Navigation Bar
   Widget _buildBottomNavigationBar() {
-    return BottomAppBar(
-      height: 54,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(
-            icon: Icons.home_outlined,
-            activeIcon: Icons.home,
-            index: 0,
-          ),
-          _buildNavItem(
-            icon: Icons.search,
-            activeIcon: Icons.search,
-            index: 1,
-          ),
-          // Disabled placeholder for 'Edit'
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.edit_outlined,
-                  color: Colors.grey[300],
-                  size: 28,
-                ),
-              ],
-            ),
-          ),
-          _buildNavItem(
-            icon: Icons.person_outline,
-            activeIcon: Icons.person,
-            index: 3,
+    return Container(
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withAlpha(77),
+            spreadRadius: 1,
+            blurRadius: 10,
+            offset: const Offset(0, -3),
           ),
         ],
+      ),
+    child: BottomAppBar(
+        height: 54,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(
+              icon: Icons.home_outlined,
+              activeIcon: Icons.home,
+              index: 0,
+            ),
+            _buildNavItem(
+              icon: Icons.message_outlined,
+              activeIcon: Icons.message,
+              index: 1,
+            ),
+            _buildNavItem(
+              icon: Icons.notifications_outlined,
+              activeIcon: Icons.notifications,
+              index: 2,
+            ),
+            _buildNavItem(
+              icon: Icons.person_outline,
+              activeIcon: Icons.person,
+              index: 3,
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // Helper widget for each navigation item
   Widget _buildNavItem({
     required IconData icon,
     required IconData activeIcon,
@@ -644,7 +491,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
             Icon(
               isSelected ? activeIcon : icon,
               color: isSelected ? primaryGreen : Colors.grey[600],
-              size: 28,
+              size: 24,
             ),
           ],
         ),
@@ -652,7 +499,6 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
     );
   }
 
-  // Logout Handler
   Future<void> _handleLogout() async {
     final confirm = await showDialog<bool>(
       context: context,
