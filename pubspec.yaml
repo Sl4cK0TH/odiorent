@@ -38,6 +38,8 @@ dependencies:
   image_picker: ^1.2.0
   intl: ^0.20.2
   fluttertoast: ^9.0.0
+  timeago: ^3.6.0
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:
@@ -65,7 +67,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/logo.png
-    - assets/icons/
+    # - assets/icons/ # Removed as the directory does not exist
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 

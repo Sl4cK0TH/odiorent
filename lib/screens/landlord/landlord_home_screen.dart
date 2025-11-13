@@ -7,6 +7,12 @@ import 'package:odiorent/services/database_service.dart';
 import 'package:odiorent/screens/landlord/add_property_screen.dart';
 import 'package:odiorent/screens/shared/welcome_screen.dart';
 import 'package:odiorent/widgets/property_card.dart';
+import 'package:odiorent/screens/landlord/landlord_edit_profile_screen.dart';
+import 'package:odiorent/screens/landlord/landlord_change_password_screen.dart';
+import 'package:odiorent/screens/shared/notifications_screen.dart';
+import 'package:odiorent/models/admin_user.dart'; // New import for AdminUser
+import 'package:odiorent/screens/landlord/landlord_edit_property_screen.dart'; // Explicitly re-add this import
+import 'package:odiorent/screens/landlord/landlord_property_details_screen.dart';
 
 class LandlordHomeScreen extends StatefulWidget {
   const LandlordHomeScreen({super.key});
@@ -23,7 +29,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   final DatabaseService _dbService = DatabaseService();
   final AuthService _authService = AuthService();
 
-  late Future<List<Property>> _propertiesFuture;
+  Future<List<Property>> _propertiesFuture = Future.value(<Property>[]);
   List<Property> _allProperties = [];
   List<Property> _filteredProperties = [];
   final TextEditingController _searchController = TextEditingController();
@@ -32,6 +38,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
 
   String _userName = 'Landlord';
   String? _userProfileImage;
+  AdminUser? _adminUser; // New state variable to hold AdminUser profile
   DateTime? lastPressed; // For double-tap to exit
 
   @override
@@ -51,29 +58,47 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   Future<void> _loadUserData() async {
     final user = _authService.getCurrentUser();
     if (user != null) {
-      setState(() {
-        _userName = user.email?.split('@')[0] ?? 'Landlord';
-      });
+      final adminUser = await _authService.getAdminUserProfile();
+      if (mounted) {
+        setState(() {
+          _adminUser = adminUser;
+          _userName = adminUser?.userName ?? user.email?.split('@')[0] ?? 'Landlord';
+          _userProfileImage = adminUser?.profilePictureUrl != null
+              ? '${adminUser!.profilePictureUrl}?t=${DateTime.now().millisecondsSinceEpoch}'
+              : null;
+        });
+      }
     }
   }
 
-  void _refreshProperties() {
+  Future<void> _refreshProperties() async {
     final String? userId = _authService.getCurrentUser()?.id;
-    if (userId != null) {
+    final future = userId != null
+        ? _dbService.getLandlordProperties(userId)
+        : Future.value(<Property>[]);
+
+    if (mounted) {
       setState(() {
-        _propertiesFuture = _dbService.getLandlordProperties(userId);
+        _propertiesFuture = future;
       });
     } else {
-      _propertiesFuture = Future.value([]);
+      _propertiesFuture = future;
     }
+
+    await future;
   }
 
   void _onItemTapped(int index) {
+    if (_selectedIndex == index && index == 0) {
+      // If already on Home tab and Home is tapped again, refresh properties
+      _refreshProperties();
+    }
     setState(() {
       _selectedIndex = index;
       if (index != 1) {
         _isSearching = false;
         _searchController.clear();
+        _filteredProperties = _allProperties;
         _searchFocusNode.unfocus(); // Unfocus when leaving search tab
       } else {
         // Request focus when search tab is selected
@@ -85,12 +110,11 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   }
 
   void _searchProperties(String query) {
-    if (query.isEmpty) {
-      setState(() {
+    setState(() {
+      _isSearching = query.isNotEmpty;
+      if (query.isEmpty) {
         _filteredProperties = _allProperties;
-      });
-    } else {
-      setState(() {
+      } else {
         _filteredProperties = _allProperties.where((property) {
           final nameLower = property.name.toLowerCase();
           final addressLower = property.address.toLowerCase();
@@ -98,8 +122,8 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
           return nameLower.contains(searchLower) ||
               addressLower.contains(searchLower);
         }).toList();
-      });
-    }
+      }
+    });
   }
 
   Future<void> _navigateToAddProperty() async {
@@ -109,10 +133,32 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
     );
 
     if (propertyCreated == true) {
-      _refreshProperties();
+      await _refreshProperties();
       setState(() {
         _selectedIndex = 0;
       });
+    }
+  }
+
+  Future<void> _navigateAndRefresh(Widget screen) async {
+    final bool? result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (context) => screen),
+    );
+    if (result == true) {
+      await _refreshProperties();
+    }
+  }
+
+  Future<void> _openPropertyDetails(Property property) async {
+    final bool? didChange = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => LandlordPropertyDetailsScreen(property: property),
+      ),
+    );
+
+    if (didChange == true) {
+      await _refreshProperties();
     }
   }
 
@@ -176,120 +222,131 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   }
 
   Widget _buildHomeTab() {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          automaticallyImplyLeading: false,
-          // No expanded height, just a regular app bar
-          floating: false,
-          pinned: true,
-          backgroundColor: lightGreen,
-          title: const Text(
-            'OdioRent',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 24,
-            ),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(
-                Icons.notifications_outlined,
-                color: Colors.white,
-              ),
-              onPressed: () => _onItemTapped(3), // Index 3 is Notifications
-            ),
-            IconButton(
-              icon: const Icon(Icons.message_outlined, color: Colors.white),
-              onPressed: () {
-                Fluttertoast.showToast(msg: "Messages screen coming soon!");
-              },
-            ),
-          ],
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'My Properties',
+    return RefreshIndicator(
+      onRefresh: _refreshProperties,
+      color: primaryGreen,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverAppBar(
+            automaticallyImplyLeading: false,
+            // No expanded height, just a regular app bar
+            floating: false,
+            pinned: true,
+            backgroundColor: lightGreen,
+            title: const Text(
+              'OdioRent',
               style: TextStyle(
-                fontSize: 20,
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
+                fontSize: 24,
+              ),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(
+                  Icons.notifications_outlined,
+                  color: Colors.white,
+                ),
+                onPressed: () => _onItemTapped(3), // Index 3 is Notifications
+              ),
+              IconButton(
+                icon: const Icon(Icons.message_outlined, color: Colors.white),
+                onPressed: () {
+                  Fluttertoast.showToast(msg: "Messages screen coming soon!");
+                },
+              ),
+            ],
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'My Properties',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
               ),
             ),
           ),
-        ),
-        FutureBuilder<List<Property>>(
-          future: _propertiesFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const SliverFillRemaining(
-                child: Center(
-                  child: CircularProgressIndicator(color: primaryGreen),
-                ),
-              );
-            }
-            if (snapshot.hasError) {
-              return SliverFillRemaining(
-                child: Center(child: Text("Error: ${snapshot.error}")),
-              );
-            }
-            final properties = snapshot.data;
-            if (properties == null || properties.isEmpty) {
-              return SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.home_work_outlined,
-                        size: 80,
-                        color: Colors.grey[300],
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        "You haven't added any properties yet.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        "Tap the '+' button below to get started!",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 14, color: Colors.grey),
-                      ),
-                    ],
+          FutureBuilder<List<Property>>(
+            future: _propertiesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SliverFillRemaining(
+                  child: Center(
+                    child: CircularProgressIndicator(color: primaryGreen),
                   ),
-                ),
-              );
-            }
-            _allProperties = properties;
-            if (_filteredProperties.isEmpty && !_isSearching) {
-              _filteredProperties = properties;
-            }
-            return SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final property = properties[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
-                  ),
-                  child: PropertyCard(property: property),
                 );
-              }, childCount: properties.length),
-            );
-          },
-        ),
-      ],
+              }
+              if (snapshot.hasError) {
+                return SliverFillRemaining(
+                  child: Center(child: Text("Error: ${snapshot.error}")),
+                );
+              }
+              final properties = snapshot.data;
+              if (properties == null || properties.isEmpty) {
+                return SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.home_work_outlined,
+                          size: 80,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          "You haven't added any properties yet.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          "Tap the '+' button below to get started!",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              _allProperties = properties;
+              if (_isSearching) {
+                _searchProperties(_searchController.text);
+              } else {
+                _filteredProperties = properties;
+              }
+              return SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final property = properties[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: GestureDetector(
+                      onTap: () => _openPropertyDetails(property),
+                      child: PropertyCard(property: property),
+                    ),
+                  );
+                }, childCount: properties.length),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildSearchTab() {
     return SafeArea(
       child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
@@ -297,10 +354,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
               child: TextField(
                 focusNode: _searchFocusNode,
                 controller: _searchController,
-                onChanged: (value) {
-                  _isSearching = true;
-                  _searchProperties(value);
-                },
+                onChanged: _searchProperties,
                 decoration: InputDecoration(
                   hintText: 'Search by name or location...',
                   prefixIcon: const Icon(Icons.search, color: primaryGreen),
@@ -351,7 +405,10 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
                         horizontal: 16.0,
                         vertical: 8.0,
                       ),
-                      child: PropertyCard(property: property),
+                      child: GestureDetector(
+                        onTap: () => _openPropertyDetails(property),
+                        child: PropertyCard(property: property),
+                      ),
                     );
                   }, childCount: _filteredProperties.length),
                 ),
@@ -367,65 +424,80 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
           automaticallyImplyLeading: false,
           pinned: true,
           backgroundColor: lightGreen,
-          title: const Text('Edit Properties'),
+          title: const Text('My Properties'),
           foregroundColor: Colors.white,
         ),
-        SliverFillRemaining(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.edit_note, size: 80, color: Colors.grey[300]),
-                const SizedBox(height: 16),
-                Text(
-                  'Edit functionality coming soon',
-                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+        FutureBuilder<List<Property>>(
+          future: _propertiesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SliverFillRemaining(
+                child: Center(
+                  child: CircularProgressIndicator(color: primaryGreen),
                 ),
-              ],
-            ),
-          ),
+              );
+            }
+            if (snapshot.hasError) {
+              return SliverFillRemaining(
+                child: Center(child: Text("Error: ${snapshot.error}")),
+              );
+            }
+            final properties = snapshot.data;
+            if (properties == null || properties.isEmpty) {
+              return SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.home_work_outlined,
+                        size: 80,
+                        color: Colors.grey[300],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "You haven't added any properties yet.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Tap the '+' button below to get started!",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            return SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final property = properties[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
+                  ),
+                  child: GestureDetector(
+                    onTap: () {
+                      _navigateAndRefresh(
+                        LandlordEditPropertyScreen(property: property),
+                      );
+                    },
+                    child: PropertyCard(property: property),
+                  ),
+                );
+              }, childCount: properties.length),
+            );
+          },
         ),
       ],
     );
   }
 
   Widget _buildNotificationsTab() {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          automaticallyImplyLeading: false,
-          pinned: true,
-          backgroundColor: lightGreen,
-          title: const Text('Notifications'),
-          foregroundColor: Colors.white,
-        ),
-        SliverFillRemaining(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.notifications_none,
-                  size: 80,
-                  color: Colors.grey[300],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No notifications yet',
-                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'You\'ll see updates about your properties here',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
+    return const NotificationsScreen();
   }
 
   Widget _buildBottomNavigationBar() {
@@ -498,7 +570,20 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
             children: [
               const SizedBox(height: 30),
               GestureDetector(
-                onTap: _showProfileDialog,
+                onTap: () async {
+                  if (_adminUser != null) {
+                    final bool? didUpdate = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => LandlordEditProfileScreen(appUser: _adminUser!),
+                      ),
+                    );
+                    if (didUpdate == true) {
+                      _loadUserData(); // Refresh profile after edit
+                    }
+                  } else {
+                    Fluttertoast.showToast(msg: "User data not loaded yet.");
+                  }
+                },
                 child: Container(
                   width: 120,
                   height: 120,
@@ -541,12 +626,25 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
               _buildSettingsTile(
                 icon: Icons.person_outline,
                 title: 'Edit Profile',
-                onTap: _showProfileDialog,
+                onTap: () async {
+                  if (_adminUser != null) {
+                    final bool? didUpdate = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => LandlordEditProfileScreen(appUser: _adminUser!),
+                      ),
+                    );
+                    if (didUpdate == true) {
+                      _loadUserData(); // Refresh profile after edit
+                    }
+                  } else {
+                    Fluttertoast.showToast(msg: "User data not loaded yet.");
+                  }
+                },
               ),
               _buildSettingsTile(
                 icon: Icons.lock_outline,
                 title: 'Change Password',
-                onTap: () => _showComingSoonDialog('Change Password'),
+                onTap: () => _navigateAndRefresh(const LandlordChangePasswordScreen()),
               ),
               _buildSettingsTile(
                 icon: Icons.business_outlined,
@@ -593,36 +691,6 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
       ),
       trailing: const Icon(Icons.chevron_right, color: Colors.grey),
       onTap: onTap,
-    );
-  }
-
-  void _showProfileDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Profile Picture'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Profile picture upload feature coming soon!',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'This is required for security purposes.',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            child: const Text('OK'),
-            onPressed: () => Navigator.of(ctx).pop(),
-          ),
-        ],
-      ),
     );
   }
 

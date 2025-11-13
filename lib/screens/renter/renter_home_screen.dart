@@ -9,7 +9,7 @@ import 'package:odiorent/widgets/property_card.dart';
 import 'package:odiorent/screens/renter/property_details_screen.dart';
 import 'package:odiorent/screens/renter/renter_edit_profile_screen.dart'; // New import
 import 'package:odiorent/screens/admin/admin_change_password_screen.dart'; // Reusing AdminChangePasswordScreen
-import 'package:odiorent/models/user.dart'; // New import for AppUser
+import 'package:odiorent/models/admin_user.dart'; // New import for AdminUser
 
 class RenterHomeScreen extends StatefulWidget {
   const RenterHomeScreen({super.key});
@@ -41,7 +41,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   bool _isSearching = false;
 
   // User data
-  AppUser? _appUser; // New: To hold the full AppUser profile
+  AdminUser? _appUser; // New: To hold the full AdminUser profile
   String _userName = 'Renter';
   String? _userProfileImage;
   DateTime? lastPressed; // For double-tap to exit
@@ -64,14 +64,14 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   Future<void> _loadUserData() async {
     final user = _authService.getCurrentUser();
     if (user != null) {
-      final appUser = await _authService.getCurrentUserProfile();
+      final appUser = await _authService.getAdminUserProfile(); // Call getAdminUserProfile
       if (mounted) {
         setState(() {
           _appUser = appUser;
           String resolvedUserName = 'Renter'; // Default if _appUser is null
           if (_appUser != null) {
             final nonNullAppUser = _appUser!; // Explicitly assert non-null
-            resolvedUserName = nonNullAppUser.userName;
+            resolvedUserName = nonNullAppUser.userName ?? 'Renter'; // Handle nullability
           }
           _userName = resolvedUserName;
           _userProfileImage = _appUser?.profilePictureUrl;

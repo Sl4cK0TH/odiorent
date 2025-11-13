@@ -131,6 +131,8 @@ This will install all required packages listed in `pubspec.yaml`.
 3. Create a storage bucket named `property-images` for property photos
 
 4. Set up Row Level Security (RLS) policies for your tables
+   - Run the SQL statements in `supabase/policies/properties.sql` inside the Supabase SQL editor to enable landlord-only CRUD access on `public.properties` (admins keep full access).
+   - Verify that RLS is enabled on the `properties` table afterwards via Table Editor → Security.
 
 5. Get your Supabase credentials:
    - Project URL

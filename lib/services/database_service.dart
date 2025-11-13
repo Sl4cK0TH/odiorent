@@ -19,10 +19,62 @@ class DatabaseService {
   Future<void> createProperty(Property property) async {
     try {
       final propertyMap = property.toJson();
-      await supabase.from('properties').insert(propertyMap);
-      debugPrint("Property created successfully!");
+      // Insert the property and immediately select it back to get the generated ID
+      final newProperty = await supabase.from('properties').insert(propertyMap).select().single();
+      debugPrint("Property created successfully with ID: ${newProperty['id']}");
+
+      // --- Create Notifications for all Admins ---
+      // 1. Fetch all admin user IDs
+      final adminUsers = await supabase.from('profiles').select('id').eq('role', 'admin');
+
+      // 2. Create a list of notification maps
+      final notifications = (adminUsers as List).map((admin) {
+        return {
+          'recipient_id': admin['id'],
+          'title': 'New Property Submission',
+          'body': 'A new property "${property.name}" is awaiting review.',
+          // Optional: You could build a deep link to the property view
+          // 'link': '/admin/property/${newProperty['id']}',
+        };
+      }).toList();
+
+      // 3. Insert all notifications in a single batch
+      if (notifications.isNotEmpty) {
+        await supabase.from('notifications').insert(notifications);
+        debugPrint("Created ${notifications.length} notifications for admins.");
+      }
+      // --- End Notification ---
+
     } catch (e) {
       debugPrint("Error creating property: $e");
+      rethrow;
+    }
+  }
+
+  /// --- DELETE PROPERTY (Landlord Function) ---
+  Future<void> deleteProperty(String propertyId) async {
+    try {
+      await supabase.from('properties').delete().eq('id', propertyId);
+      debugPrint("Property $propertyId deleted successfully!");
+    } catch (e) {
+      debugPrint("Error deleting property: $e");
+      rethrow;
+    }
+  }
+
+  /// --- UPDATE PROPERTY (Landlord Function) ---
+  Future<void> updateProperty(Property property) async {
+    try {
+      final propertyMap = property.toJson();
+      debugPrint("Updating property with ID: ${property.id}, Data: $propertyMap"); // Debugging line
+      // The property ID must not be null when updating.
+      if (property.id == null) {
+        throw Exception("Property ID cannot be null when updating.");
+      }
+      await supabase.from('properties').update(propertyMap).eq('id', property.id!);
+      debugPrint("Property ${property.id} updated successfully!");
+    } catch (e) {
+      debugPrint("Error updating property: $e");
       rethrow;
     }
   }
@@ -112,7 +164,12 @@ class DatabaseService {
   }
 
   /// --- UPDATE PROPERTY STATUS (Admin Function) ---
-  Future<void> updatePropertyStatus(String propertyId, String status) async {
+  Future<void> updatePropertyStatus({
+    required String propertyId,
+    required String status,
+    required String landlordId,
+    required String propertyName,
+  }) async {
     try {
       if (status != 'approved' && status != 'rejected' && status != 'pending') {
         throw Exception(
@@ -124,13 +181,21 @@ class DatabaseService {
       if (status == 'approved') {
         updateData['approved_at'] = DateTime.now().toIso8601String();
       } else {
-        updateData['approved_at'] = null; // Clear approved_at if status changes from approved
+        updateData['approved_at'] =
+            null; // Clear approved_at if status changes from approved
       }
 
-      await supabase
-          .from('properties')
-          .update(updateData)
-          .eq('id', propertyId);
+      await supabase.from('properties').update(updateData).eq('id', propertyId);
+
+      // --- Create Notification for Landlord ---
+      final notificationBody =
+          'Your property "$propertyName" has been ${status == 'approved' ? 'Approved' : 'Rejected'}.';
+      await supabase.from('notifications').insert({
+        'recipient_id': landlordId,
+        'title': 'Property Status Update',
+        'body': notificationBody,
+      });
+      // --- End Notification ---
 
       debugPrint("Property $propertyId status updated to: $status");
     } catch (e) {
@@ -143,31 +208,29 @@ class DatabaseService {
   /// Updates the first name, middle name, and last name of a user in the 'profiles' table.
   Future<void> updateUserProfile({
     required String userId,
-    required String firstName,
+    String? firstName,
     String? middleName,
-    required String lastName,
-    required String phoneNumber,
-    String? userName, // New optional parameter
-    String? profilePictureUrl, // New optional parameter
+    String? lastName,
+    String? phoneNumber,
+    String? userName,
+    String? profilePictureUrl,
   }) async {
     try {
-      final Map<String, dynamic> updates = {
-        'first_name': firstName,
-        'last_name': lastName,
-        'middle_name': middleName,
-        'phone_number': phoneNumber,
-      };
+      final Map<String, dynamic> updates = {};
+      if (firstName != null) updates['first_name'] = firstName;
+      if (middleName != null) updates['middle_name'] = middleName;
+      if (lastName != null) updates['last_name'] = lastName;
+      if (phoneNumber != null) updates['phone_number'] = phoneNumber;
+      if (userName != null) updates['user_name'] = userName;
+      if (profilePictureUrl != null) updates['profile_picture_url'] = profilePictureUrl;
 
-      if (userName != null) {
-        updates['user_name'] = userName;
+      if (updates.isNotEmpty) {
+        debugPrint("Attempting to update profile for user $userId with data: $updates");
+        await supabase.from('profiles').update(updates).eq('id', userId);
+        debugPrint("✅ Profile update successful for user $userId");
       }
-      if (profilePictureUrl != null) {
-        updates['profile_picture_url'] = profilePictureUrl;
-      }
-
-      await supabase.from('profiles').update(updates).eq('id', userId);
     } catch (e) {
-      debugPrint("Error updating user profile: $e");
+      debugPrint("❌ Error updating user profile: $e");
       rethrow;
     }
   }

@@ -29,9 +29,14 @@ class _RejectedPropertiesListState extends State<RejectedPropertiesList> {
     });
   }
 
-  Future<void> _updatePropertyStatus(String propertyId, String status) async {
+  Future<void> _updatePropertyStatus(String propertyId, String status, String landlordId, String propertyName) async {
     try {
-      await _dbService.updatePropertyStatus(propertyId, status);
+      await _dbService.updatePropertyStatus(
+        propertyId: propertyId,
+        status: status,
+        landlordId: landlordId,
+        propertyName: propertyName,
+      );
       Fluttertoast.showToast(
         msg: "Property $status successfully!", // Fixed string interpolation
         toastLength: Toast.LENGTH_SHORT,
@@ -102,8 +107,12 @@ class _RejectedPropertiesListState extends State<RejectedPropertiesList> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         ElevatedButton.icon(
-                          onPressed: () =>
-                              _updatePropertyStatus(property.id!, 'approved'),
+                          onPressed: () => _updatePropertyStatus(
+                            property.id!,
+                            'approved',
+                            property.landlordId,
+                            property.name,
+                          ),
                           icon: const Icon(Icons.check),
                           label: const Text('Approve'),
                           style: ElevatedButton.styleFrom(

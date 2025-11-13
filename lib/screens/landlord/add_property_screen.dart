@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart'; // Import the package
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/auth_service.dart';
 import 'package:odiorent/services/database_service.dart';
 import 'package:odiorent/services/storage_service.dart';
 import 'package:odiorent/widgets/custom_button.dart';
+import 'package:path/path.dart' as p; // Import path package with prefix
 
 class AddPropertyScreen extends StatefulWidget {
   const AddPropertyScreen({super.key});
@@ -67,8 +69,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   Future<void> _handleCreateProperty() async {
     if (!_formKey.currentState!.validate()) return; // Check form
     if (_selectedImages.isEmpty) {
-      // Check if at least one image is selected
-      _showErrorDialog("Please upload at least one image.");
+      Fluttertoast.showToast(
+        msg: "Please upload at least one image.",
+        backgroundColor: Colors.red,
+      );
       return;
     }
 
@@ -80,12 +84,24 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         throw Exception("User not logged in.");
       }
 
-      // 1. Upload Images
-      List<String> imageUrls = [];
-      for (File imageFile in _selectedImages) {
-        final String url = await _storageService.uploadImage(imageFile, userId);
-        imageUrls.add(url);
-      }
+      // 1. Upload Images concurrently
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final uploadTasks = _selectedImages.asMap().entries.map((entry) async {
+        final imageFile = entry.value;
+        final bytes = await imageFile.readAsBytes();
+        final extension = p.extension(imageFile.path).isEmpty
+            ? '.jpg'
+            : p.extension(imageFile.path);
+        final fileName = 'property_${userId}_${timestamp}_${entry.key}$extension';
+
+        return _storageService.uploadFile(
+          bucket: 'properties',
+          bytes: bytes,
+          fileName: fileName,
+          userId: userId,
+        );
+      }).toList();
+      final imageUrls = await Future.wait(uploadTasks);
 
       // 2. Create Property Object
       final newProperty = Property(
@@ -98,7 +114,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         beds: int.parse(_bedsController.text.trim()),
         imageUrls: imageUrls,
         status: 'pending', // Always 'pending' on creation
-        createdAt: DateTime.now(), // Set creation date
+        createdAt: DateTime.now().toUtc(), // Set creation date
       );
 
       // 3. Save to Database
@@ -106,34 +122,24 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
       if (!mounted) return;
 
+      Fluttertoast.showToast(
+        msg: "Property submitted for review!",
+        backgroundColor: Colors.green,
+      );
+
       // 4. Go back to home screen
       // Pass 'true' back to tell the home screen to refresh
       Navigator.of(context).pop(true);
     } catch (e) {
-      if (!mounted) return;
-      _showErrorDialog("Error creating property: ${e.toString()}");
+      Fluttertoast.showToast(
+        msg: "Error creating property: $e",
+        backgroundColor: Colors.red,
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  // Helper for error dialogs
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('An Error Occurred'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            child: const Text('Okay'),
-            onPressed: () => Navigator.of(ctx).pop(),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -177,6 +183,11 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                     labelText: 'Price (₱)',
                     prefixIcon: Icons.attach_money,
                     keyboardType: TextInputType.number,
+                    validator: (value) => _validateNumber(
+                      value,
+                      allowDecimal: true,
+                      emptyMessage: 'Price is required',
+                    ),
                   ),
                   const SizedBox(height: 16),
                   _buildTextField(
@@ -184,6 +195,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                     labelText: 'Rooms',
                     prefixIcon: Icons.meeting_room,
                     keyboardType: TextInputType.number,
+                    validator: (value) => _validateNumber(
+                      value,
+                      emptyMessage: 'Number of rooms is required',
+                    ),
                   ),
                   const SizedBox(height: 16),
                   _buildTextField(
@@ -191,6 +206,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                     labelText: 'Beds',
                     prefixIcon: Icons.bed,
                     keyboardType: TextInputType.number,
+                    validator: (value) => _validateNumber(
+                      value,
+                      emptyMessage: 'Number of beds is required',
+                    ),
                   ),
                   const SizedBox(height: 24),
 
@@ -323,5 +342,28 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             return null;
           },
     );
+  }
+
+  String? _validateNumber(
+    String? value, {
+    bool allowDecimal = false,
+    required String emptyMessage,
+  }) {
+    if (value == null || value.trim().isEmpty) {
+      return emptyMessage;
+    }
+    final sanitizedValue = value.trim();
+    if (allowDecimal) {
+      final parsed = double.tryParse(sanitizedValue);
+      if (parsed == null || parsed <= 0) {
+        return 'Enter a valid amount';
+      }
+    } else {
+      final parsed = int.tryParse(sanitizedValue);
+      if (parsed == null || parsed <= 0) {
+        return 'Enter a whole number';
+      }
+    }
+    return null;
   }
 }

@@ -26,7 +26,12 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
 
     try {
       // Call the database service
-      await _dbService.updatePropertyStatus(widget.property.id!, newStatus);
+      await _dbService.updatePropertyStatus(
+        propertyId: widget.property.id!,
+        status: newStatus,
+        landlordId: widget.property.landlordId,
+        propertyName: widget.property.name,
+      );
 
       if (!mounted) return;
 
