@@ -178,7 +178,10 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
             _buildAccountTab(), // 3
           ],
         ),
-        bottomNavigationBar: _buildBottomNavigationBar(),
+        bottomNavigationBar: Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: _buildBottomNavigationBar(),
+        ),
         floatingActionButton: FloatingActionButton(
           onPressed: _navigateToAddProperty,
           backgroundColor: primaryGreen,
