@@ -28,6 +28,10 @@ class Property {
   final String? landlordUsername;
   final String? landlordPhoneNumber;
 
+  // New: Rating details (populated from the 'properties_with_avg_rating' view)
+  final double averageRating;
+  final int ratingCount;
+
   // --- Constructor ---
   Property({
     this.id, // Nullable
@@ -48,6 +52,8 @@ class Property {
     this.landlordLastName,
     this.landlordUsername,
     this.landlordPhoneNumber,
+    this.averageRating = 0.0, // New
+    this.ratingCount = 0, // New
   });
 
   /// --- `toJson` Method ---
@@ -75,33 +81,29 @@ class Property {
   /// Creates a Property object *from* a Map (JSON) received from Supabase.
   /// This is used for reading properties from the database.
   factory Property.fromMap(Map<String, dynamic> json) {
-    final profile = json['profiles'] as Map<String, dynamic>?;
     return Property(
       id: json['id'] as String?,
       landlordId: json['landlord_id'] as String,
       name: json['name'] as String,
       address: json['address'] as String,
       description: json['description'] as String,
-      // The 'price' might be returned as an int or double,
-      // so we use .toDouble() to be safe.
       price: (json['price'] as num).toDouble(),
       rooms: json['rooms'] as int,
       beds: json['beds'] as int,
-      // Supabase returns arrays as a List<dynamic>. We must convert
-      // it to a List<String>.
       imageUrls: List<String>.from(json['image_urls'] as List<dynamic>),
       status: json['status'] as String,
-      createdAt: DateTime.parse(json['created_at'] as String), // Parse created_at
+      createdAt: DateTime.parse(json['created_at'] as String),
       approvedAt: json['approved_at'] != null
           ? DateTime.parse(json['approved_at'] as String)
-          : null, // Parse approved_at if not null
-      // Populate landlord details if available from a join
-      landlordName: profile?['user_name'] as String?,
-      landlordEmail: profile?['email'] as String?,
-      landlordFirstName: profile?['first_name'] as String?,
-      landlordLastName: profile?['last_name'] as String?,
-      landlordUsername: profile?['user_name'] as String?,
-      landlordPhoneNumber: profile?['phone_number'] as String?,
+          : null,
+      landlordName: json['user_name'] as String?,
+      landlordEmail: json['email'] as String?,
+      landlordFirstName: json['first_name'] as String?,
+      landlordLastName: json['last_name'] as String?,
+      landlordUsername: json['user_name'] as String?,
+      landlordPhoneNumber: json['phone_number'] as String?,
+      averageRating: (json['average_rating'] as num? ?? 0.0).toDouble(),
+      ratingCount: json['rating_count'] as int? ?? 0,
     );
   }
 }

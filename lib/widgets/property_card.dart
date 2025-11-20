@@ -96,12 +96,22 @@ class PropertyCard extends StatelessWidget {
                 const SizedBox(height: 8),
 
                 // --- Address ---
-                Text(
-                  property.address,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.star, color: Colors.yellow[700], size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        property.averageRating.toStringAsFixed(1),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        "(${property.ratingCount} ratings)",
+                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                    ],
+                  ),
                 const SizedBox(height: 12),
 
                 // --- Status Badge ---

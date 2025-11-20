@@ -13,43 +13,27 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 
+CREATE SCHEMA IF NOT EXISTS "public";
+
+
+ALTER SCHEMA "public" OWNER TO "pg_database_owner";
+
+
 COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
 
-CREATE EXTENSION IF NOT EXISTS "pg_graphql" WITH SCHEMA "graphql";
+CREATE OR REPLACE FUNCTION "public"."debug_storage_policy_check"("path_text" "text") RETURNS TABLE("current_user_id" "text", "first_folder_in_path" "text", "are_they_equal" boolean)
+    LANGUAGE "sql"
+    AS $$
+    SELECT
+        auth.uid()::text AS current_user_id,
+        (storage.foldername(path_text))[1] AS first_folder_in_path,
+        (auth.uid()::text = (storage.foldername(path_text))[1]) AS are_they_equal;
+$$;
 
 
-
-
-
-
-CREATE EXTENSION IF NOT EXISTS "pg_stat_statements" WITH SCHEMA "extensions";
-
-
-
-
-
-
-CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA "extensions";
-
-
-
-
-
-
-CREATE EXTENSION IF NOT EXISTS "supabase_vault" WITH SCHEMA "vault";
-
-
-
-
-
-
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
-
-
-
-
+ALTER FUNCTION "public"."debug_storage_policy_check"("path_text" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
@@ -248,21 +232,29 @@ ALTER TABLE ONLY "public"."properties"
 
 
 
-CREATE POLICY "Admins can update any property" ON "public"."properties" FOR UPDATE TO "authenticated" USING ((( SELECT "profiles"."role"
+CREATE POLICY "Allow admins full access" ON "public"."properties" USING ((( SELECT "profiles"."role"
    FROM "public"."profiles"
-  WHERE ("profiles"."id" = ( SELECT "auth"."uid"() AS "uid"))) = 'admin'::"text")) WITH CHECK ((( SELECT "profiles"."role"
+  WHERE ("profiles"."id" = "auth"."uid"())) = 'admin'::"text")) WITH CHECK ((( SELECT "profiles"."role"
    FROM "public"."profiles"
-  WHERE ("profiles"."id" = ( SELECT "auth"."uid"() AS "uid"))) = 'admin'::"text"));
+  WHERE ("profiles"."id" = "auth"."uid"())) = 'admin'::"text"));
 
 
 
-CREATE POLICY "Admins can view all properties" ON "public"."properties" FOR SELECT TO "authenticated" USING ((( SELECT "profiles"."role"
+CREATE POLICY "Allow admins to create notifications" ON "public"."notifications" FOR INSERT TO "authenticated" WITH CHECK ((( SELECT "profiles"."role"
    FROM "public"."profiles"
   WHERE ("profiles"."id" = "auth"."uid"())) = 'admin'::"text"));
 
 
 
 CREATE POLICY "Allow anon select on profiles" ON "public"."profiles" FOR SELECT TO "anon" USING (true);
+
+
+
+CREATE POLICY "Allow landlords to manage their own properties" ON "public"."properties" USING (("auth"."uid"() = "landlord_id")) WITH CHECK (("auth"."uid"() = "landlord_id"));
+
+
+
+CREATE POLICY "Allow public read access to approved properties" ON "public"."properties" FOR SELECT USING (("status" = 'approved'::"text"));
 
 
 
@@ -290,25 +282,11 @@ CREATE POLICY "Allow read/write if user is a participant" ON "public"."messages"
 
 
 
-CREATE POLICY "Landlords can create properties" ON "public"."properties" FOR INSERT TO "authenticated" WITH CHECK ((( SELECT "profiles"."role"
-   FROM "public"."profiles"
-  WHERE ("profiles"."id" = ( SELECT "auth"."uid"() AS "uid"))) = 'landlord'::"text"));
+CREATE POLICY "Allow users to read their own profile" ON "public"."profiles" FOR SELECT USING (("auth"."uid"() = "id"));
 
 
 
-CREATE POLICY "Landlords can delete their own properties" ON "public"."properties" FOR DELETE TO "authenticated" USING (("auth"."uid"() = "landlord_id"));
-
-
-
-CREATE POLICY "Landlords can insert their own properties" ON "public"."properties" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "landlord_id"));
-
-
-
-CREATE POLICY "Landlords can read their own properties" ON "public"."properties" FOR SELECT TO "authenticated" USING (("auth"."uid"() = "landlord_id"));
-
-
-
-CREATE POLICY "Landlords can update their own properties" ON "public"."properties" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "landlord_id")) WITH CHECK (("auth"."uid"() = "landlord_id"));
+CREATE POLICY "Allow users to update their own profile" ON "public"."profiles" FOR UPDATE USING (("auth"."uid"() = "id")) WITH CHECK (("auth"."uid"() = "id"));
 
 
 
@@ -316,7 +294,7 @@ CREATE POLICY "Users can view their own notifications" ON "public"."notification
 
 
 
-CREATE POLICY "allow_public_read_approved_properties" ON "public"."properties" FOR SELECT USING (("status" = 'approved'::"text"));
+CREATE POLICY "allow_authenticated_read_all_profiles" ON "public"."profiles" FOR SELECT TO "authenticated" USING (true);
 
 
 
@@ -346,15 +324,6 @@ CREATE POLICY "profiles_update_own_profile" ON "public"."profiles" FOR UPDATE TO
 ALTER TABLE "public"."properties" ENABLE ROW LEVEL SECURITY;
 
 
-
-
-ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
-
-
-
-
-
-
 GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
@@ -362,174 +331,15 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+GRANT ALL ON FUNCTION "public"."debug_storage_policy_check"("path_text" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."debug_storage_policy_check"("path_text" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."debug_storage_policy_check"("path_text" "text") TO "service_role";
 
 
 
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -569,12 +379,6 @@ GRANT ALL ON TABLE "public"."properties" TO "service_role";
 
 
 
-
-
-
-
-
-
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "postgres";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "authenticated";
@@ -599,30 +403,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

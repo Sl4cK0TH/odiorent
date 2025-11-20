@@ -1,0 +1,372 @@
+import 'package:flutter/material.dart';
+import 'package:odiorent/models/property.dart';
+import 'package:odiorent/services/auth_service.dart';
+import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/screens/shared/chat_room_screen.dart';
+
+class PropertyDetailsScreen extends StatefulWidget {
+  final Property property;
+  const PropertyDetailsScreen({super.key, required this.property});
+
+  @override
+  State<PropertyDetailsScreen> createState() => _PropertyDetailsScreenState();
+}
+
+class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
+  // --- Brand Colors (Green Palette) ---
+  static const Color primaryGreen = Color(0xFF4CAF50);
+  static const Color lightGreen = Color(0xFF66BB6A);
+  static const Color darkGreen = Color(0xFF388E3C);
+
+  final DatabaseService _dbService = DatabaseService();
+  final AuthService _authService = AuthService();
+
+  late Property _property;
+  bool _isSubmitting = false; // Combined loading state
+
+  @override
+  void initState() {
+    super.initState();
+    _property = widget.property;
+    _fetchPropertyDetails();
+  }
+
+  void _handleMessageLandlord() async {
+    setState(() => _isSubmitting = true);
+    try {
+      final renterId = _authService.getCurrentUser()?.id;
+      if (renterId == null) throw Exception('User not found');
+      
+      final chatId = await _dbService.getOrCreateChat(
+        renterId: renterId,
+        landlordId: _property.landlordId,
+        propertyId: _property.id!,
+      );
+      
+      if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ChatRoomScreen(
+              chatId: chatId,
+              propertyName: _property.name,
+              otherUserEmail: _property.landlordName ?? 'Landlord',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error starting chat: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if(mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _fetchPropertyDetails() async {
+    final propertyId = widget.property.id;
+    if (propertyId == null) return;
+    
+    setState(() => _isSubmitting = true);
+    try {
+      final response = await _dbService.getPropertyWithLandlordDetails(propertyId);
+      if (!mounted) return;
+      setState(() {
+        _property = Property.fromMap(response);
+      });
+    } catch (e) {
+      debugPrint('Error fetching property details: $e');
+    } finally {
+      if(mounted) setState(() => _isSubmitting = false);
+    }
+  }
+  
+  void _showRatingDialog(BuildContext context) {
+    int currentRating = 3;
+    String comment = "";
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text("Rate this Property"),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text("Your rating: $currentRating stars"),
+                    Slider(
+                      value: currentRating.toDouble(),
+                      min: 1,
+                      max: 5,
+                      divisions: 4,
+                      label: currentRating.round().toString(),
+                      onChanged: (double value) => setDialogState(() => currentRating = value.round()),
+                    ),
+                    TextField(
+                      onChanged: (value) => comment = value,
+                      decoration: const InputDecoration(hintText: "Leave a comment (optional)"),
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text("Cancel"),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                ),
+                ElevatedButton(
+                  child: const Text("Submit"),
+                  onPressed: () async {
+                    final userId = _authService.getCurrentUser()?.id;
+                    if (userId == null) return;
+                    
+                    try {
+                      await _dbService.addPropertyRating(
+                        propertyId: _property.id!,
+                        userId: userId,
+                        rating: currentRating,
+                        comment: comment.isNotEmpty ? comment : null,
+                      );
+                      Navigator.of(dialogContext).pop();
+                      _fetchPropertyDetails(); // Refresh details to show new rating
+                      if(mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Rating submitted!"), backgroundColor: Colors.green),
+                        );
+                      }
+                    } catch(e) {
+                       Navigator.of(dialogContext).pop();
+                       if(mounted) {
+                         ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Error: ${e.toString()}"), backgroundColor: Colors.red),
+                        );
+                       }
+                    }
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final property = _property;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(property.name),
+        backgroundColor: lightGreen,
+        foregroundColor: Colors.white,
+      ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.grey.withAlpha(51), spreadRadius: 2, blurRadius: 5)],
+        ),
+        child: _isSubmitting
+            ? const Center(heightFactor: 1.0, child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: primaryGreen, strokeWidth: 3)))
+            : Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.message_outlined),
+                      label: const Text('Message Landlord'),
+                      onPressed: _handleMessageLandlord,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.star_border, size: 18),
+                    label: const Text("Rate"),
+                    onPressed: () => _showRatingDialog(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryGreen,
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      side: const BorderSide(color: primaryGreen),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+      body: _isSubmitting && property.id == widget.property.id // Show loading only on initial fetch
+          ? const Center(child: CircularProgressIndicator(color: primaryGreen))
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // --- Image Carousel ---
+                  SizedBox(
+                    height: 250,
+                    child: PageView.builder(
+                      itemCount: property.imageUrls.isNotEmpty ? property.imageUrls.length : 1,
+                      itemBuilder: (context, index) {
+                        return property.imageUrls.isNotEmpty
+                            ? Image.network(
+                                property.imageUrls[index],
+                                fit: BoxFit.cover,
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return const Center(child: CircularProgressIndicator(color: primaryGreen));
+                                },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Center(child: Icon(Icons.broken_image, size: 50, color: Colors.grey));
+                                },
+                              )
+                            : Container(
+                                color: Colors.grey[200],
+                                child: const Center(child: Icon(Icons.image_not_supported, size: 50, color: Colors.grey)),
+                              );
+                      },
+                    ),
+                  ),
+
+                  // --- Details Section ---
+                  Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // --- Price ---
+                        Text(
+                          '₱${property.price.toStringAsFixed(2)} / month',
+                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: darkGreen),
+                        ),
+                        const SizedBox(height: 8),
+
+                        // --- Name ---
+                        Text(
+                          property.name,
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        
+                        // --- Address & Rating ---
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Expanded(child: Text(property.address, style: const TextStyle(fontSize: 16, color: Colors.grey))),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.star, color: Colors.yellow[700], size: 18),
+                            const SizedBox(width: 4),
+                            Text(
+                              property.averageRating.toStringAsFixed(1),
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              "(${property.ratingCount} ratings)",
+                              style: const TextStyle(fontSize: 14, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // --- Room/Bed Stats ---
+                        Row(
+                          children: [
+                            _buildStatChip(Icons.bed_outlined, '${property.beds} Beds'),
+                            const SizedBox(width: 12),
+                            _buildStatChip(Icons.meeting_room_outlined, '${property.rooms} Rooms'),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // --- Description ---
+                        const Text('Description', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Divider(thickness: 0.5, height: 20),
+                        Text(property.description, style: const TextStyle(fontSize: 16, height: 1.5)),
+                        const SizedBox(height: 24),
+                        
+                        // --- Landlord Info ---
+                        const Text('Landlord Information', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Divider(thickness: 0.5, height: 20),
+                        _buildInfoRow('Full Name', _formatFullName(property)),
+                        _buildInfoRow('Email', property.landlordEmail ?? 'N/A'),
+                        _buildInfoRow('Contact Number', property.landlordPhoneNumber ?? 'N/A'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  // Helper widget for the stat chips (beds, rooms)
+  Widget _buildStatChip(IconData icon, String label) {
+    return Chip(
+      avatar: Icon(icon, size: 18, color: darkGreen),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      backgroundColor: primaryGreen.withAlpha(26),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: primaryGreen.withAlpha(77)),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatFullName(Property property) {
+    final parts = <String>[];
+    final firstName = property.landlordFirstName?.trim();
+    final lastName = property.landlordLastName?.trim();
+    if (firstName != null && firstName.isNotEmpty) {
+      parts.add(firstName);
+    }
+    if (lastName != null && lastName.isNotEmpty) {
+      parts.add(lastName);
+    }
+    if (parts.isEmpty) {
+      return property.landlordName ?? 'N/A';
+    }
+    return parts.join(' ');
+  }
+}

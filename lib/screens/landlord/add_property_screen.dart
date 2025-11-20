@@ -24,11 +24,19 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   // Form key and controllers
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  final _streetAddressController = TextEditingController();
+  final List<String> _barangays = [
+    "Amatong", "Bangon", "Batiano", "Budiong", "Canduyong", "Dapawan",
+    "Gabas", "Gabawan", "Libertad", "Ligaya", "Liwanag", "Liwayway",
+    "Progreso Este", "Progreso Weste", "Poctoy", "Panique", "Pato-o",
+    "Rizal", "Tabing Dagat", "Tabobo-an", "Tumingad", "Tulay", "Tuburan",
+    "Anahao", "Bangcogon"
+  ];
+  String? _selectedBarangay;
   final _priceController = TextEditingController();
   final _roomsController = TextEditingController();
   final _bedsController = TextEditingController();
+  final _descriptionController = TextEditingController();
 
   // Services
   final _dbService = DatabaseService();
@@ -44,7 +52,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   void dispose() {
     // Dispose all controllers
     _nameController.dispose();
-    _addressController.dispose();
+    _streetAddressController.dispose();
     _descriptionController.dispose();
     _priceController.dispose();
     _roomsController.dispose();
@@ -104,10 +112,11 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       final imageUrls = await Future.wait(uploadTasks);
 
       // 2. Create Property Object
+      final fullAddress = "${_streetAddressController.text.trim()}, $_selectedBarangay, Odiongan, Romblon";
       final newProperty = Property(
         landlordId: userId,
         name: _nameController.text.trim(),
-        address: _addressController.text.trim(),
+        address: fullAddress,
         description: _descriptionController.text.trim(),
         price: double.parse(_priceController.text.trim()),
         rooms: int.parse(_roomsController.text.trim()),
@@ -165,11 +174,64 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                     prefixIcon: Icons.home,
                   ),
                   const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _addressController,
-                    labelText: 'Address',
-                    prefixIcon: Icons.location_on,
+                Card(
+                  elevation: 2.0,
+                  margin: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Barangay", style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedBarangay,
+                          hint: const Text("Select Barangay"),
+                          items: _barangays.map((String barangay) {
+                            return DropdownMenuItem<String>(
+                              value: barangay,
+                              child: Text(barangay),
+                            );
+                          }).toList(),
+                          onChanged: (newValue) {
+                            setState(() {
+                              _selectedBarangay = newValue;
+                            });
+                          },
+                          validator: (value) => value == null ? "Please select a barangay" : null,
+                          decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero),
+                        ),
+                      ],
+                    ),
                   ),
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  elevation: 2.0,
+                  margin: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Street / House No.", style: Theme.of(context).textTheme.titleMedium),
+                        TextFormField(
+                          controller: _streetAddressController,
+                          decoration: const InputDecoration(
+                            hintText: "e.g., 123 Main St, Zone 1",
+                            border: InputBorder.none,
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return "Please enter the street address";
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                   const SizedBox(height: 16),
                   _buildTextField(
                     controller: _descriptionController,

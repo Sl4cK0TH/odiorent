@@ -32,9 +32,8 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   final DatabaseService _dbService = DatabaseService();
   final AuthService _authService = AuthService();
 
-  // Properties
-  List<Property> _allProperties = [];
-  List<Property> _filteredProperties = [];
+  // Properties future
+  Future<List<Property>>? _propertiesFuture;
 
   // Search
   final TextEditingController _searchController = TextEditingController();
@@ -49,9 +48,9 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   void initState() {
     super.initState();
     _loadUserData();
-    _refreshProperties();
+    _loadProperties();
     _searchController.addListener(() {
-      _searchProperties(_searchController.text);
+      _loadProperties(query: _searchController.text);
     });
   }
 
@@ -84,12 +83,9 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   }
 
   // Function to refresh the list
-  Future<void> _refreshProperties() async {
-    final properties = await _dbService.getApprovedProperties();
+  void _loadProperties({String? query}) {
     setState(() {
-      _allProperties = properties;
-      _filteredProperties = properties;
-      _searchController.clear();
+      _propertiesFuture = _dbService.getApprovedProperties(searchQuery: query);
     });
   }
 
@@ -97,23 +93,6 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-    });
-  }
-
-  // Search properties
-  void _searchProperties(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _filteredProperties = _allProperties;
-      } else {
-        _filteredProperties = _allProperties.where((property) {
-          final nameLower = property.name.toLowerCase();
-          final addressLower = property.address.toLowerCase();
-          final searchLower = query.toLowerCase();
-          return nameLower.contains(searchLower) ||
-              addressLower.contains(searchLower);
-        }).toList();
-      }
     });
   }
 
@@ -168,7 +147,9 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
   // Home Tab - Property List
   Widget _buildHomeTab() {
     return RefreshIndicator(
-      onRefresh: _refreshProperties,
+      onRefresh: () async {
+        _loadProperties(); // Refresh with current search query
+      },
       color: primaryGreen,
       child: CustomScrollView(
         slivers: [
@@ -193,7 +174,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Search by name or location...',
+                  hintText: 'Search by name, address, description...',
                   prefixIcon: const Icon(Icons.search, color: primaryGreen),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
@@ -217,23 +198,36 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
           ),
 
           // Section Title
-          SliverToBoxAdapter(
+          const SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16.0, 24.0, 16.0, 8.0),
+              padding: EdgeInsets.fromLTRB(16.0, 24.0, 16.0, 8.0),
               child: Text(
                 'Available Properties',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
                 ),
               ),
             ),
           ),
 
           // Properties List
-          _filteredProperties.isEmpty
-              ? SliverFillRemaining(
+          FutureBuilder<List<Property>>(
+            future: _propertiesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator(color: primaryGreen)),
+                );
+              }
+              if (snapshot.hasError) {
+                return SliverFillRemaining(
+                  child: Center(child: Text('Error: ${snapshot.error}')),
+                );
+              }
+              final properties = snapshot.data ?? [];
+              if (properties.isEmpty) {
+                return SliverFillRemaining(
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -256,10 +250,12 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                       ],
                     ),
                   ),
-                )
-              : SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final property = _filteredProperties[index];
+                );
+              }
+              return SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final property = properties[index];
                     return Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16.0,
@@ -269,16 +265,19 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  PropertyDetailsScreen(property: property),
+                              builder: (context) => PropertyDetailsScreen(property: property),
                             ),
-                          );
+                          ).then((_) => _loadProperties(query: _searchController.text));
                         },
                         child: PropertyCard(property: property),
                       ),
                     );
-                  }, childCount: _filteredProperties.length),
+                  },
+                  childCount: properties.length,
                 ),
+              );
+            },
+          ),
         ],
       ),
     );

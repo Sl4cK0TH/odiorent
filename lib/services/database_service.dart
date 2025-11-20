@@ -9,20 +9,20 @@ final supabase = Supabase.instance.client;
 /// This class will handle all database interactions with Supabase.
 /// We will add all our database-related functions here.
 class DatabaseService {
-  // Helper query string for selecting properties with joined landlord details
-  static const String _propertySelectQuery = '''
-    *,
-    profiles!landlord_id(
-      first_name,
-      last_name,
-      user_name,
-      email,
-      phone_number
-    )
-  ''';
-
   /// --- CREATE PROPERTY (Day 3 Task) ---
   Future<void> createProperty(Property property) async {
+    // Anti-duplication check
+    final existingCheck = await supabase
+        .from('properties')
+        .select('id')
+        .eq('name', property.name)
+        .eq('landlord_id', property.landlordId)
+        .maybeSingle();
+
+    if (existingCheck != null) {
+      throw Exception('A property with the same name already exists.');
+    }
+
     try {
       final propertyMap = property.toJson();
       // Insert the property and immediately select it back to get the generated ID
@@ -89,8 +89,8 @@ class DatabaseService {
   Future<List<Property>> getLandlordProperties(String landlordId) async {
     try {
       final response = await supabase
-          .from('properties')
-          .select(_propertySelectQuery) // Use the helper query
+          .from('properties_with_avg_rating') // Use the new view
+          .select('*')
           .eq('landlord_id', landlordId);
 
       final properties = (response as List<dynamic>)
@@ -105,13 +105,11 @@ class DatabaseService {
   }
 
   /// --- GET PENDING PROPERTIES (Admin Function) ---
-  /// This method is now deprecated in favor of getPropertiesByStatusWithLandlordDetails
-  /// but kept for existing usage.
   Future<List<Property>> getPendingProperties() async {
     try {
       final response = await supabase
-          .from('properties')
-          .select(_propertySelectQuery) // Use the helper query
+          .from('properties_with_avg_rating') // Use the new view
+          .select('*')
           .eq('status', 'pending')
           .order('created_at', ascending: false);
 
@@ -131,8 +129,8 @@ class DatabaseService {
   Future<List<Property>> getAllPropertiesWithLandlordDetails() async {
     try {
       final response = await supabase
-          .from('properties')
-          .select(_propertySelectQuery)
+          .from('properties_with_avg_rating') // Use the new view
+          .select('*')
           .order('created_at', ascending: false);
 
       final properties = (response as List<dynamic>)
@@ -152,8 +150,8 @@ class DatabaseService {
       String status) async {
     try {
       final response = await supabase
-          .from('properties')
-          .select(_propertySelectQuery)
+          .from('properties_with_avg_rating') // Use the new view
+          .select('*')
           .eq('status', status)
           .order('created_at', ascending: false);
 
@@ -211,7 +209,6 @@ class DatabaseService {
   }
 
   /// --- UPDATE USER PROFILE ---
-  /// Updates the first name, middle name, and last name of a user in the 'profiles' table.
   Future<void> updateUserProfile({
     required String userId,
     String? firstName,
@@ -245,21 +242,11 @@ class DatabaseService {
   Future<Map<String, dynamic>> getPropertyWithLandlordDetails(String propertyId) async {
     try {
       final response = await supabase
-          .from('properties')
-          .select('''
-            *,
-            profiles!landlord_id (
-              first_name,
-              last_name,
-              user_name,
-              email,
-              phone_number
-            )
-          ''')
+          .from('properties_with_avg_rating') // Use the new view
+          .select('*')
           .eq('id', propertyId)
           .single();
 
-      debugPrint("Supabase response for property details: $response"); // Debugging line
       return response;
     } catch (e) {
       debugPrint("Error getting property with landlord details: $e");
@@ -267,21 +254,28 @@ class DatabaseService {
     }
   }
 
-  /// --- GET APPROVED PROPERTIES (Day 5 Task) ---
-  /// Fetches all properties with 'approved' status for renters to browse.
-  ///
-  /// Returns a list of [Property] objects.
-  Future<List<Property>> getApprovedProperties() async {
+  /// --- GET APPROVED PROPERTIES (Day 5 Task, updated for Search & Ratings) ---
+  /// Fetches all 'approved' properties, with optional keyword filtering via RPC.
+  Future<List<Property>> getApprovedProperties({String? searchQuery}) async {
     try {
-      // Select all properties where status is 'approved'
-      final response = await supabase
-          .from('properties')
-          .select(_propertySelectQuery) // Use the helper query
-          .eq('status', 'approved')
-          .order('created_at', ascending: false); // Most recent first
+      late final List<dynamic> data;
 
-      // Convert the response to a list of Property objects
-      final properties = (response as List<dynamic>)
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        // If there's a search query, call the RPC function
+        data = await supabase.rpc(
+          'search_properties',
+          params: {'search_term': searchQuery},
+        );
+      } else {
+        // Otherwise, fetch all approved properties from the view
+        data = await supabase
+            .from('properties_with_avg_rating')
+            .select('*')
+            .eq('status', 'approved')
+            .order('created_at', ascending: false);
+      }
+
+      final properties = data
           .map((json) => Property.fromMap(json as Map<String, dynamic>))
           .toList();
 
@@ -289,13 +283,33 @@ class DatabaseService {
       return properties;
     } catch (e) {
       debugPrint("Error getting approved properties: $e");
-      // Return an empty list on error
       return [];
     }
   }
 
+  /// --- ADD PROPERTY RATING (Day 6 Task) ---
+  /// Allows a user to add a rating for a property.
+  Future<void> addPropertyRating({
+    required String propertyId,
+    required String userId,
+    required int rating,
+    String? comment,
+  }) async {
+    try {
+      await supabase.from('property_ratings').upsert({
+        'property_id': propertyId,
+        'user_id': userId,
+        'rating': rating,
+        'comment': comment,
+      }, onConflict: 'unique_user_property_rating'); // Use upsert to handle updates
+      debugPrint("Rating added/updated successfully for property $propertyId by user $userId");
+    } catch (e) {
+      debugPrint("Error adding/updating rating: $e");
+      rethrow;
+    }
+  }
+
   /// --- GET ALL PROPERTIES COUNT (Admin Function) ---
-  /// Fetches the total number of properties in the database.
   Future<int> getPropertiesCount() async {
     try {
       final response = await supabase
