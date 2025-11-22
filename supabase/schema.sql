@@ -70,64 +70,6 @@ SET default_tablespace = '';
 SET default_table_access_method = "heap";
 
 
-CREATE TABLE IF NOT EXISTS "public"."chat_participants" (
-    "chat_id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "user_id" "uuid" DEFAULT "gen_random_uuid"()
-);
-
-
-ALTER TABLE "public"."chat_participants" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."chat_participants" IS 'We need two tables for chat. One holds the chat "room," and the other links users to that room.';
-
-
-
-CREATE TABLE IF NOT EXISTS "public"."chats" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "last_message" "text",
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "last_message_at" timestamp with time zone DEFAULT "now"()
-);
-
-
-ALTER TABLE "public"."chats" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."chats" IS 'We need two tables for chat. One holds the chat "room," and the other links users to that room.';
-
-
-
-CREATE TABLE IF NOT EXISTS "public"."messages" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "chat_id" "uuid",
-    "sender_id" "uuid",
-    "text" "text",
-    "sent_at" timestamp with time zone DEFAULT "now"() NOT NULL
-);
-
-
-ALTER TABLE "public"."messages" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."messages" IS 'The table to hold the actual messages for each chat.';
-
-
-
-CREATE TABLE IF NOT EXISTS "public"."notifications" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "recipient_id" "uuid" NOT NULL,
-    "title" "text" NOT NULL,
-    "body" "text" NOT NULL,
-    "link" "text",
-    "is_read" boolean DEFAULT false NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
-);
-
-
-ALTER TABLE "public"."notifications" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "email" character varying,
@@ -172,6 +114,138 @@ COMMENT ON TABLE "public"."properties" IS 'This table will store the rental list
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."property_ratings" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "property_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "rating" smallint NOT NULL,
+    "comment" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "property_ratings_rating_check" CHECK ((("rating" >= 1) AND ("rating" <= 5)))
+);
+
+
+ALTER TABLE "public"."property_ratings" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."properties_with_avg_rating" AS
+ SELECT "p"."id",
+    "p"."landlord_id",
+    "p"."name",
+    "p"."address",
+    "p"."description",
+    "p"."price",
+    "p"."rooms",
+    "p"."beds",
+    "p"."image_urls",
+    "p"."status",
+    "p"."created_at",
+    "p"."approved_at",
+    COALESCE("avg_ratings"."average_rating", (0)::numeric) AS "average_rating",
+    COALESCE("avg_ratings"."rating_count", (0)::bigint) AS "rating_count",
+    "prof"."user_name",
+    "prof"."first_name",
+    "prof"."last_name",
+    "prof"."email",
+    "prof"."phone_number"
+   FROM (("public"."properties" "p"
+     LEFT JOIN ( SELECT "pr"."property_id",
+            "avg"("pr"."rating") AS "average_rating",
+            "count"("pr"."id") AS "rating_count"
+           FROM "public"."property_ratings" "pr"
+          GROUP BY "pr"."property_id") "avg_ratings" ON (("p"."id" = "avg_ratings"."property_id")))
+     LEFT JOIN "public"."profiles" "prof" ON (("p"."landlord_id" = "prof"."id")));
+
+
+ALTER VIEW "public"."properties_with_avg_rating" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."search_properties"("search_term" "text") RETURNS SETOF "public"."properties_with_avg_rating"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  RETURN QUERY
+  SELECT *
+  FROM public.properties_with_avg_rating
+  WHERE
+    status = 'approved' AND (
+      name ILIKE '%' || search_term || '%'
+      OR address ILIKE '%' || search_term || '%'
+      OR description ILIKE '%' || search_term || '%'
+      OR user_name ILIKE '%' || search_term || '%'
+      OR first_name ILIKE '%' || search_term || '%'
+      OR last_name ILIKE '%' || search_term || '%'
+    )
+  ORDER BY created_at DESC;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."search_properties"("search_term" "text") OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."chat_participants" (
+    "chat_id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" DEFAULT "gen_random_uuid"(),
+    "last_read_at" timestamp with time zone
+);
+
+
+ALTER TABLE "public"."chat_participants" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."chat_participants" IS 'We need two tables for chat. One holds the chat "room," and the other links users to that room.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."chats" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "last_message" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "last_message_at" timestamp with time zone DEFAULT "now"(),
+    "renter_id" "uuid",
+    "landlord_id" "uuid",
+    "property_id" "uuid"
+);
+
+
+ALTER TABLE "public"."chats" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."chats" IS 'We need two tables for chat. One holds the chat "room," and the other links users to that room.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."messages" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "chat_id" "uuid",
+    "sender_id" "uuid",
+    "text" "text",
+    "sent_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."messages" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."messages" IS 'The table to hold the actual messages for each chat.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."notifications" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "recipient_id" "uuid" NOT NULL,
+    "title" "text" NOT NULL,
+    "body" "text" NOT NULL,
+    "link" "text",
+    "is_read" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."notifications" OWNER TO "postgres";
+
+
 ALTER TABLE ONLY "public"."chats"
     ADD CONSTRAINT "chats_pkey" PRIMARY KEY ("id");
 
@@ -197,6 +271,16 @@ ALTER TABLE ONLY "public"."properties"
 
 
 
+ALTER TABLE ONLY "public"."property_ratings"
+    ADD CONSTRAINT "property_ratings_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."property_ratings"
+    ADD CONSTRAINT "unique_user_property_rating" UNIQUE ("user_id", "property_id");
+
+
+
 ALTER TABLE ONLY "public"."chat_participants"
     ADD CONSTRAINT "chat_participants_chat_id_fkey" FOREIGN KEY ("chat_id") REFERENCES "public"."chats"("id");
 
@@ -204,6 +288,21 @@ ALTER TABLE ONLY "public"."chat_participants"
 
 ALTER TABLE ONLY "public"."chat_participants"
     ADD CONSTRAINT "chat_participants_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."chats"
+    ADD CONSTRAINT "fk_chats_landlord" FOREIGN KEY ("landlord_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."chats"
+    ADD CONSTRAINT "fk_chats_property" FOREIGN KEY ("property_id") REFERENCES "public"."properties"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."chats"
+    ADD CONSTRAINT "fk_chats_renter" FOREIGN KEY ("renter_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
 
 
@@ -232,6 +331,16 @@ ALTER TABLE ONLY "public"."properties"
 
 
 
+ALTER TABLE ONLY "public"."property_ratings"
+    ADD CONSTRAINT "property_ratings_property_id_fkey" FOREIGN KEY ("property_id") REFERENCES "public"."properties"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."property_ratings"
+    ADD CONSTRAINT "property_ratings_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 CREATE POLICY "Allow admins full access" ON "public"."properties" USING ((( SELECT "profiles"."role"
    FROM "public"."profiles"
   WHERE ("profiles"."id" = "auth"."uid"())) = 'admin'::"text")) WITH CHECK ((( SELECT "profiles"."role"
@@ -247,6 +356,10 @@ CREATE POLICY "Allow admins to create notifications" ON "public"."notifications"
 
 
 CREATE POLICY "Allow anon select on profiles" ON "public"."profiles" FOR SELECT TO "anon" USING (true);
+
+
+
+CREATE POLICY "Allow authenticated read access to all ratings" ON "public"."property_ratings" FOR SELECT TO "authenticated" USING (true);
 
 
 
@@ -282,11 +395,23 @@ CREATE POLICY "Allow read/write if user is a participant" ON "public"."messages"
 
 
 
+CREATE POLICY "Allow users to delete their own rating" ON "public"."property_ratings" FOR DELETE TO "authenticated" USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Allow users to insert their own rating" ON "public"."property_ratings" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "user_id"));
+
+
+
 CREATE POLICY "Allow users to read their own profile" ON "public"."profiles" FOR SELECT USING (("auth"."uid"() = "id"));
 
 
 
 CREATE POLICY "Allow users to update their own profile" ON "public"."profiles" FOR UPDATE USING (("auth"."uid"() = "id")) WITH CHECK (("auth"."uid"() = "id"));
+
+
+
+CREATE POLICY "Allow users to update their own rating" ON "public"."property_ratings" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "user_id"));
 
 
 
@@ -307,9 +432,6 @@ ALTER TABLE "public"."chats" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."messages" ENABLE ROW LEVEL SECURITY;
 
 
-ALTER TABLE "public"."notifications" ENABLE ROW LEVEL SECURITY;
-
-
 ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
 
 
@@ -322,6 +444,9 @@ CREATE POLICY "profiles_update_own_profile" ON "public"."profiles" FOR UPDATE TO
 
 
 ALTER TABLE "public"."properties" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."property_ratings" ENABLE ROW LEVEL SECURITY;
 
 
 GRANT USAGE ON SCHEMA "public" TO "postgres";
@@ -340,6 +465,36 @@ GRANT ALL ON FUNCTION "public"."debug_storage_policy_check"("path_text" "text") 
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."profiles" TO "anon";
+GRANT ALL ON TABLE "public"."profiles" TO "authenticated";
+GRANT ALL ON TABLE "public"."profiles" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."properties" TO "anon";
+GRANT ALL ON TABLE "public"."properties" TO "authenticated";
+GRANT ALL ON TABLE "public"."properties" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."property_ratings" TO "anon";
+GRANT ALL ON TABLE "public"."property_ratings" TO "authenticated";
+GRANT ALL ON TABLE "public"."property_ratings" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."properties_with_avg_rating" TO "anon";
+GRANT ALL ON TABLE "public"."properties_with_avg_rating" TO "authenticated";
+GRANT ALL ON TABLE "public"."properties_with_avg_rating" TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."search_properties"("search_term" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."search_properties"("search_term" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."search_properties"("search_term" "text") TO "service_role";
 
 
 
@@ -364,18 +519,6 @@ GRANT ALL ON TABLE "public"."messages" TO "service_role";
 GRANT ALL ON TABLE "public"."notifications" TO "anon";
 GRANT ALL ON TABLE "public"."notifications" TO "authenticated";
 GRANT ALL ON TABLE "public"."notifications" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."profiles" TO "anon";
-GRANT ALL ON TABLE "public"."profiles" TO "authenticated";
-GRANT ALL ON TABLE "public"."profiles" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."properties" TO "anon";
-GRANT ALL ON TABLE "public"."properties" TO "authenticated";
-GRANT ALL ON TABLE "public"."properties" TO "service_role";
 
 
 

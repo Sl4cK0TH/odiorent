@@ -418,7 +418,7 @@ class DatabaseService {
         .from('messages')
         .stream(primaryKey: ['id'])
         .eq('chat_id', chatId)
-        .order('timestamp', ascending: true)
+        .order('sent_at', ascending: true)
         .map((data) {
           debugPrint("Received ${data.length} messages");
           return data.map((msg) => Message.fromMap(msg)).toList();
@@ -440,7 +440,7 @@ class DatabaseService {
         senderId: senderId,
         senderEmail: senderEmail,
         content: content,
-        timestamp: DateTime.now(),
+        sentAt: DateTime.now(),
       );
 
       await supabase.from('messages').insert(message.toMap());

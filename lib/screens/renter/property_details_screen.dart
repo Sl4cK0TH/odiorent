@@ -81,7 +81,8 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
             builder: (context) => ChatRoomScreen(
               chatId: chatId,
               propertyName: _property.name,
-              otherUserEmail: 'Landlord',
+              otherUserName: _formatFullName(_property),
+              // otherUserProfileUrl: _property.profile_picture_url, // This field doesn't exist on Property model
             ),
           ),
         );
