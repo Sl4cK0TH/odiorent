@@ -1,0 +1,69 @@
+class Chat {
+  final String id;
+  final String? lastMessage;
+  final DateTime? lastMessageAt;
+  final String? propertyName;
+  final String? propertyAddress;
+  final List<String>? propertyImageUrls;
+  final String otherUserId;
+  final String? otherUserName;
+  final String? otherUserFirstName;
+  final String? otherUserLastName;
+  final String? otherUserProfilePicture;
+
+  Chat({
+    required this.id,
+    this.lastMessage,
+    this.lastMessageAt,
+    this.propertyName,
+    this.propertyAddress,
+    this.propertyImageUrls,
+    required this.otherUserId,
+    this.otherUserName,
+    this.otherUserFirstName,
+    this.otherUserLastName,
+    this.otherUserProfilePicture,
+  });
+
+  factory Chat.fromMap(Map<String, dynamic> map, String currentUserId) {
+    // Determine which participant is the "other" user
+    final participant1 = map['participant_1'] as Map<String, dynamic>?;
+    final participant2 = map['participant_2'] as Map<String, dynamic>?;
+    
+    final isParticipant1Current = participant1?['id'] == currentUserId;
+    final otherUser = isParticipant1Current ? participant2 : participant1;
+
+    // Get property info
+    final property = map['property'] as Map<String, dynamic>?;
+    final imageUrls = property?['image_urls'] as List?;
+
+    return Chat(
+      id: map['id'] as String,
+      lastMessage: map['last_message'] as String?,
+      lastMessageAt: map['last_message_at'] != null
+          ? DateTime.parse(map['last_message_at'] as String)
+          : null,
+      propertyName: property?['name'] as String?,
+      propertyAddress: property?['address'] as String?,
+      propertyImageUrls: imageUrls?.map((e) => e.toString()).toList(),
+      otherUserId: otherUser?['id'] as String? ?? '',
+      otherUserName: otherUser?['user_name'] as String?,
+      otherUserFirstName: otherUser?['first_name'] as String?,
+      otherUserLastName: otherUser?['last_name'] as String?,
+      otherUserProfilePicture: otherUser?['profile_picture_url'] as String?,
+    );
+  }
+
+  String get otherUserDisplayName {
+    if (otherUserName != null && otherUserName!.isNotEmpty) {
+      return otherUserName!;
+    }
+    if (otherUserFirstName != null && otherUserLastName != null) {
+      return '$otherUserFirstName $otherUserLastName';
+    }
+    if (otherUserFirstName != null) {
+      return otherUserFirstName!;
+    }
+    return 'Unknown User';
+  }
+}

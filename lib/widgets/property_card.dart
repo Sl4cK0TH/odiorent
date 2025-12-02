@@ -5,21 +5,23 @@ class PropertyCard extends StatelessWidget {
   final Property property;
   const PropertyCard({super.key, required this.property});
 
-  // Helper to get status color
-  Color _getStatusColor(String status) {
+  // Helper to get status color, now accepts the enum
+  Color _getStatusColor(PropertyStatus status) {
     switch (status) {
-      case 'approved':
+      case PropertyStatus.approved:
         return Colors.green;
-      case 'rejected':
+      case PropertyStatus.rejected:
         return Colors.red;
-      case 'pending':
-      default:
+      case PropertyStatus.pending:
         return Colors.orange;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Get the string representation of the status
+    final statusString = statusToString(property.status);
+
     return Card(
       elevation: 4.0,
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -96,22 +98,22 @@ class PropertyCard extends StatelessWidget {
                 const SizedBox(height: 8),
 
                 // --- Address ---
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.star, color: Colors.yellow[700], size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        property.averageRating.toStringAsFixed(1),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        "(${property.ratingCount} ratings)",
-                        style: const TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.star, color: Colors.yellow[700], size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      property.averageRating.toStringAsFixed(1),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "(${property.ratingCount} ratings)",
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 12),
 
                 // --- Status Badge ---
@@ -125,9 +127,8 @@ class PropertyCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    // Capitalize the first letter
-                    property.status[0].toUpperCase() +
-                        property.status.substring(1),
+                    // Capitalize the first letter of the string status
+                    statusString[0].toUpperCase() + statusString.substring(1),
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,

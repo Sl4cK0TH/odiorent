@@ -1,6 +1,79 @@
-# Changelog - November 12, 2025
+# Changelog
 
-This document summarizes the key improvements and bug fixes implemented during our session.
+## December 2, 2025
+
+### New Features
+
+#### Real-time Messaging System
+- **Chat List Implementation:** Added fully functional messages screens for both Renter and Landlord users
+  - Displays all active chats with last message preview
+  - Shows time ago format for message timestamps
+  - Pull-to-refresh functionality
+  - Profile pictures and user avatars
+  
+- **Chat Room Enhancements:**
+  - Updated to Supabase realtime API v2 (fixed deprecated `.on()` method)
+  - Working presence detection (online/offline status)
+  - Typing indicators
+  - Read receipts with checkmarks
+  - Multimedia message support (images)
+
+- **Smart Initial Messages:** When a renter first contacts a landlord about a property:
+  - Message input is pre-filled with property context
+  - Format: "Hi! I'm interested in '[Property Name]' at [Address]. Is it still available?"
+  - Only triggers on new chat creation
+  - User can edit or send as-is
+
+#### Data Model Updates
+- **Created Chat Model** (`lib/models/chat.dart`):
+  - Handles complex nested chat data from database
+  - Intelligently determines "other user" in conversation
+  - Provides helper methods for user display names
+
+- **Enhanced Property Model:**
+  - Added `landlordProfilePicture` field
+  - Now includes all landlord information for seamless chat initiation
+
+### Bug Fixes
+
+#### Database & Backend
+- **Fixed PostgreSQL Trigger:** Updated `notify_on_new_message` trigger to use correct `net.http_post` syntax
+  - Changed from deprecated `net` schema to proper `extensions` schema usage
+  - Fixed parameter ordering (url, body, headers)
+  - Added proper error handling with `SECURITY DEFINER`
+
+- **Updated Database Views:**
+  - Added `profile_picture_url` to `properties_with_avg_rating` view
+  - Ensures landlord profile pictures are available in property listings
+
+- **Enhanced Chat Creation:**
+  - `getOrCreateChat()` now returns both `chatId` and `isNewChat` flag
+  - Enables smart detection of new vs. existing conversations
+
+#### Code Quality
+- **Fixed Supabase Realtime API Issues:**
+  - Replaced `RealtimeListenTypes.presence` with `.onPresenceSync()`
+  - Replaced `RealtimeListenTypes.broadcast` with `.onBroadcast()`
+  - Fixed payload handling for presence events
+  - Updated broadcast message sending to use `.sendBroadcastMessage()`
+
+- **Fixed Property Card Switch Statement:**
+  - Removed unreachable default clause
+  - Cleaner enum handling for `PropertyStatus`
+
+- **Code Style Improvements:**
+  - Added braces to single-line if statements in `database_service.dart`
+  - All files pass `flutter analyze` with zero issues
+
+### Technical Improvements
+- Proper type safety with explicit type casts
+- Better error handling in async operations
+- Improved state management in chat screens
+- Optimized database queries with proper joins
+
+---
+
+## November 12, 2025
 
 ### Bug Fixes
 - **Navigation:** Corrected a critical navigation bug where the `AppBar` "Notifications" icon was incorrectly directing users to the "Edit" page. The navigation indices for all tabs have been re-mapped to ensure correct routing.

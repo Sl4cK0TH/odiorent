@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:odiorent/models/property.dart';
+import 'package:odiorent/models/chat.dart';
 import 'package:odiorent/services/auth_service.dart';
 import 'package:odiorent/services/database_service.dart';
 import 'package:odiorent/screens/landlord/add_property_screen.dart';
 import 'package:odiorent/screens/shared/welcome_screen.dart';
+import 'package:odiorent/screens/shared/chat_room_screen.dart';
 import 'package:odiorent/widgets/property_card.dart';
 import 'package:odiorent/screens/landlord/landlord_edit_profile_screen.dart';
 import 'package:odiorent/screens/landlord/landlord_change_password_screen.dart';
 import 'package:odiorent/screens/shared/notifications_screen.dart';
 import 'package:odiorent/models/admin_user.dart'; // New import for AdminUser
 import 'package:odiorent/screens/landlord/landlord_property_details_screen.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 class LandlordHomeScreen extends StatefulWidget {
   const LandlordHomeScreen({super.key});
@@ -33,6 +36,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
 
   String _userName = 'Landlord';
   String? _userProfileImage;
+  String? _currentUserId;
   AdminUser? _adminUser; // New state variable to hold AdminUser profile
   DateTime? lastPressed; // For double-tap to exit
 
@@ -55,6 +59,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
       final adminUser = await _authService.getAdminUserProfile();
       if (mounted) {
         setState(() {
+          _currentUserId = user.id;
           _adminUser = adminUser;
           _userName = adminUser?.userName ?? user.email?.split('@')[0] ?? 'Landlord';
           _userProfileImage = adminUser?.profilePictureUrl != null
@@ -356,20 +361,136 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   }
 
   Widget _buildMessagesTab() {
-    return SafeArea(
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.message_outlined, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'Messages feature coming soon!',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+    if (_currentUserId == null) {
+      return const Center(child: CircularProgressIndicator(color: primaryGreen));
+    }
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _dbService.getUserChats(_currentUserId!),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: primaryGreen));
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Error loading chats: ${snapshot.error}'),
+          );
+        }
+
+        final chatsData = snapshot.data ?? [];
+        if (chatsData.isEmpty) {
+          return SafeArea(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.message_outlined, size: 80, color: Colors.grey[300]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No messages yet',
+                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Messages from renters will appear here',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+          );
+        }
+
+        final chats = chatsData.map((data) {
+          return Chat.fromMap(data, _currentUserId!);
+        }).toList();
+
+        return SafeArea(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              setState(() {}); // Trigger rebuild
+            },
+            color: primaryGreen,
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: chats.length,
+              itemBuilder: (context, index) {
+                final chat = chats[index];
+                return _buildChatTile(chat);
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildChatTile(Chat chat) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: CircleAvatar(
+        radius: 28,
+        backgroundColor: lightGreen.withAlpha(51),
+        backgroundImage: chat.otherUserProfilePicture != null
+            ? NetworkImage(chat.otherUserProfilePicture!)
+            : null,
+        child: chat.otherUserProfilePicture == null
+            ? Text(
+                chat.otherUserDisplayName.isNotEmpty
+                    ? chat.otherUserDisplayName[0].toUpperCase()
+                    : '?',
+                style: const TextStyle(
+                  color: primaryGreen,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              )
+            : null,
       ),
+      title: Text(
+        chat.otherUserDisplayName,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (chat.propertyName != null)
+            Text(
+              chat.propertyName!,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          if (chat.lastMessage != null)
+            Text(
+              chat.lastMessage!,
+              style: const TextStyle(fontSize: 14),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+        ],
+      ),
+      trailing: chat.lastMessageAt != null
+          ? Text(
+              timeago.format(chat.lastMessageAt!),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            )
+          : null,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatRoomScreen(
+              chatId: chat.id,
+              propertyName: chat.propertyName ?? 'Property',
+              otherUserName: chat.otherUserDisplayName,
+              otherUserProfileUrl: chat.otherUserProfilePicture,
+              otherUserId: chat.otherUserId,
+            ),
+          ),
+        ).then((_) => setState(() {})); // Refresh when returning
+      },
     );
   }
 

@@ -18,18 +18,19 @@ class _RejectedPropertiesListState extends State<RejectedPropertiesList> {
   @override
   void initState() {
     super.initState();
-    _propertiesFuture =
-        _dbService.getPropertiesByStatusWithLandlordDetails('rejected');
+    _propertiesFuture = _dbService
+        .getPropertiesByStatusWithLandlordDetails(PropertyStatus.rejected);
   }
 
   void _refreshList() {
     setState(() {
-      _propertiesFuture =
-          _dbService.getPropertiesByStatusWithLandlordDetails('rejected');
+      _propertiesFuture = _dbService
+          .getPropertiesByStatusWithLandlordDetails(PropertyStatus.rejected);
     });
   }
 
-  Future<void> _updatePropertyStatus(String propertyId, String status, String landlordId, String propertyName) async {
+  Future<void> _updatePropertyStatus(String propertyId, PropertyStatus status,
+      String landlordId, String propertyName) async {
     try {
       await _dbService.updatePropertyStatus(
         propertyId: propertyId,
@@ -38,7 +39,7 @@ class _RejectedPropertiesListState extends State<RejectedPropertiesList> {
         propertyName: propertyName,
       );
       Fluttertoast.showToast(
-        msg: "Property $status successfully!", // Fixed string interpolation
+        msg: "Property ${statusToString(status)} successfully!",
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.green,
@@ -101,7 +102,8 @@ class _RejectedPropertiesListState extends State<RejectedPropertiesList> {
                       Text(
                         'Approved: ${DateFormat('MMM d, yyyy').format(property.approvedAt!)}',
                       ),
-                    Text('Status: ${property.status.toUpperCase()}'),
+                    Text(
+                        'Status: ${statusToString(property.status).toUpperCase()}'),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -109,7 +111,7 @@ class _RejectedPropertiesListState extends State<RejectedPropertiesList> {
                         ElevatedButton.icon(
                           onPressed: () => _updatePropertyStatus(
                             property.id!,
-                            'approved',
+                            PropertyStatus.approved,
                             property.landlordId,
                             property.name,
                           ),

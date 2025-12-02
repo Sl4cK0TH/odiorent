@@ -8,9 +8,9 @@ OdioRent is a Flutter-based mobile application designed to streamline the proper
 - **Property Listings:** Landlords can create, update, and delete property listings with images and detailed descriptions.
 - **Advanced Search:** Renters can search for properties using keywords that match property names, addresses, descriptions, or landlord names.
 - **Property Ratings:** Renters can rate properties and view average ratings, helping them make informed decisions.
+- **Real-time Chat:** Fully functional messaging system with real-time presence detection, typing indicators, read receipts, and multimedia support.
 - **Admin Dashboard:** Admins can review and manage property listings (approve/reject).
 - **Secure Authentication:** Powered by Supabase for user sign-up, login, and profile management.
-- **Real-time Chat:** (In-progress) Functionality for renters and landlords to communicate directly.
 
 ## Technology Stack
 

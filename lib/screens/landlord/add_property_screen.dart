@@ -122,7 +122,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         rooms: int.parse(_roomsController.text.trim()),
         beds: int.parse(_bedsController.text.trim()),
         imageUrls: imageUrls,
-        status: 'pending', // Always 'pending' on creation
+        status: PropertyStatus.pending, // Always 'pending' on creation
         createdAt: DateTime.now().toUtc(), // Set creation date
       );
 

@@ -1,15 +1,36 @@
 // lib/models/user.dart
 
+// ENUM for user role to match the database ENUM.
+enum UserRole {
+  renter,
+  landlord,
+  admin,
+}
+
+// Helper function to convert a string to a UserRole enum value.
+UserRole roleFromString(String? role) {
+  switch (role) {
+    case 'landlord':
+      return UserRole.landlord;
+    case 'admin':
+      return UserRole.admin;
+    case 'renter':
+    default:
+      return UserRole.renter;
+  }
+}
+
 class AppUser {
   final String id;
   final String email;
-  final String role;
+  final UserRole role;
   final String lastName;
   final String firstName;
-  final String? middleName; // Nullable
+  final String? middleName;
   final String userName;
   final String phoneNumber;
-  final String? profilePictureUrl; // New: Nullable field for profile picture URL
+  final String? profilePictureUrl;
+  final DateTime? lastSeen; // For online presence
 
   AppUser({
     required this.id,
@@ -20,21 +41,26 @@ class AppUser {
     this.middleName,
     required this.userName,
     required this.phoneNumber,
-    this.profilePictureUrl, // New: Add to constructor
+    this.profilePictureUrl,
+    this.lastSeen, // Add to constructor
   });
 
-  // Factory constructor to create an AppUser from a JSON map (e.g., from Supabase)
+  // Factory constructor to create an AppUser from a JSON map
   factory AppUser.fromJson(Map<String, dynamic> json) {
     return AppUser(
       id: json['id'],
       email: json['email'],
-      role: json['role'],
+      role: roleFromString(json['role'] as String?),
       lastName: json['last_name'],
       firstName: json['first_name'],
-      middleName: json['middle_name'], // Supabase returns null if not present
+      middleName: json['middle_name'],
       userName: json['user_name'],
       phoneNumber: json['phone_number'],
-      profilePictureUrl: json['profile_picture_url'], // New: Parse profile picture URL
+      profilePictureUrl: json['profile_picture_url'],
+      // Parse the last_seen timestamp
+      lastSeen: json['last_seen'] == null
+          ? null
+          : DateTime.parse(json['last_seen'] as String),
     );
   }
 }

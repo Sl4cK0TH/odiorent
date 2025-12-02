@@ -65,7 +65,8 @@ class _OverallPropertiesListState extends State<OverallPropertiesList> {
                       Text(
                         'Approved: ${DateFormat('MMM d, yyyy').format(property.approvedAt!)}',
                       ),
-                    Text('Status: ${property.status.toUpperCase()}'),
+                    Text(
+                        'Status: ${statusToString(property.status).toUpperCase()}'),
                     // Add more details as needed
                   ],
                 ),

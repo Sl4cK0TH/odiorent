@@ -19,17 +19,18 @@ class _PendingPropertiesListState extends State<PendingPropertiesList> {
   void initState() {
     super.initState();
     _propertiesFuture =
-        _dbService.getPropertiesByStatusWithLandlordDetails('pending');
+        _dbService.getPropertiesByStatusWithLandlordDetails(PropertyStatus.pending);
   }
 
   void _refreshList() {
     setState(() {
       _propertiesFuture =
-          _dbService.getPropertiesByStatusWithLandlordDetails('pending');
+          _dbService.getPropertiesByStatusWithLandlordDetails(PropertyStatus.pending);
     });
   }
 
-  Future<void> _updatePropertyStatus(String propertyId, String status, String landlordId, String propertyName) async {
+  Future<void> _updatePropertyStatus(String propertyId, PropertyStatus status,
+      String landlordId, String propertyName) async {
     try {
       await _dbService.updatePropertyStatus(
         propertyId: propertyId,
@@ -38,7 +39,7 @@ class _PendingPropertiesListState extends State<PendingPropertiesList> {
         propertyName: propertyName,
       );
       Fluttertoast.showToast(
-        msg: "Property $status successfully!", // Fixed string interpolation
+        msg: "Property ${statusToString(status)} successfully!",
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.green,
@@ -104,7 +105,7 @@ class _PendingPropertiesListState extends State<PendingPropertiesList> {
                         ElevatedButton.icon(
                           onPressed: () => _updatePropertyStatus(
                             property.id!,
-                            'approved',
+                            PropertyStatus.approved,
                             property.landlordId,
                             property.name,
                           ),
@@ -119,7 +120,7 @@ class _PendingPropertiesListState extends State<PendingPropertiesList> {
                         ElevatedButton.icon(
                           onPressed: () => _updatePropertyStatus(
                             property.id!,
-                            'rejected',
+                            PropertyStatus.rejected,
                             property.landlordId,
                             property.name,
                           ),

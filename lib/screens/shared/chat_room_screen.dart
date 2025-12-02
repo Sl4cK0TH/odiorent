@@ -1,14 +1,21 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:odiorent/models/message.dart';
 import 'package:odiorent/services/auth_service.dart';
-import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/services/database_service.dart' hide supabase;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timeago/timeago.dart' as timeago;
+
+final supabase = Supabase.instance.client;
 
 class ChatRoomScreen extends StatefulWidget {
   final String chatId;
   final String propertyName;
   final String otherUserName;
   final String? otherUserProfileUrl;
+  final String otherUserId;
+  final String? initialMessage;
 
   const ChatRoomScreen({
     super.key,
@@ -16,6 +23,8 @@ class ChatRoomScreen extends StatefulWidget {
     required this.propertyName,
     required this.otherUserName,
     this.otherUserProfileUrl,
+    required this.otherUserId,
+    this.initialMessage,
   });
 
   @override
@@ -26,35 +35,112 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   static const Color primaryGreen = Color(0xFF4CAF50);
   static const Color lightGreen = Color(0xFF66BB6A);
 
-  final DatabaseService _dbService = DatabaseService();
-  final AuthService _authService = AuthService();
-  final TextEditingController _messageController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+  final _dbService = DatabaseService();
+  final _authService = AuthService();
+  final _messageController = TextEditingController();
+  final _scrollController = ScrollController();
+  final _picker = ImagePicker();
 
   String? _currentUserId;
-  String? _currentUserEmail;
+  bool _isSending = false;
+
+  // -- Real-time Feature State --
+  RealtimeChannel? _chatChannel;
+  bool _isOtherUserOnline = false;
+  Timer? _lastSeenTimer;
+  bool _isOtherUserTyping = false;
+  Timer? _typingTimer;
+  // -----------------------------
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentUser();
+    _loadCurrentUserAndSetup();
+    _messageController.addListener(_handleTyping);
+    
+    // Set initial message if provided (for new chats)
+    if (widget.initialMessage != null) {
+      _messageController.text = widget.initialMessage!;
+    }
   }
 
   @override
   void dispose() {
+    _lastSeenTimer?.cancel();
+    _typingTimer?.cancel();
+    if (_chatChannel != null) {
+      _chatChannel!.untrack();
+      supabase.removeChannel(_chatChannel!);
+    }
+    _messageController.removeListener(_handleTyping);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _loadCurrentUser() {
+  void _loadCurrentUserAndSetup() {
     final user = _authService.getCurrentUser();
     if (user != null) {
-      setState(() {
-        _currentUserId = user.id;
-        _currentUserEmail = user.email;
-      });
+      _currentUserId = user.id;
+      _setupChatChannel();
+      setState(() {});
     }
+  }
+
+  void _setupChatChannel() {
+    if (_currentUserId == null) return;
+
+    _chatChannel = supabase.channel('chat:${widget.chatId}');
+
+    _chatChannel!
+        .onPresenceSync((payload) {
+      final presenceState = _chatChannel!.presenceState();
+      final isOnline = presenceState.any((presence) =>
+          presence.presences.any((p) => p.payload['user_id'] == widget.otherUserId));
+      if (mounted) {
+        setState(() {
+          _isOtherUserOnline = isOnline;
+        });
+      }
+    }).onPresenceJoin((payload) {
+      final joins = payload.newPresences;
+      if (joins.any((p) => p.payload['user_id'] == widget.otherUserId)) {
+        if (mounted) setState(() => _isOtherUserOnline = true);
+      }
+    }).onPresenceLeave((payload) {
+      final leaves = payload.leftPresences;
+      if (leaves.any((p) => p.payload['user_id'] == widget.otherUserId)) {
+        if (mounted) setState(() => _isOtherUserOnline = false);
+      }
+    }).onBroadcast(event: 'typing', callback: (payload) {
+      if (payload['user_id'] != _currentUserId) {
+        if (mounted) setState(() => _isOtherUserTyping = true);
+        _typingTimer?.cancel();
+        _typingTimer = Timer(const Duration(seconds: 2), () {
+          if (mounted) setState(() => _isOtherUserTyping = false);
+        });
+      }
+    });
+
+    _chatChannel!.subscribe((status, [ref]) async {
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        await _chatChannel!.track({'user_id': _currentUserId});
+        _dbService.markMessagesAsRead(widget.chatId, _currentUserId!);
+      }
+    });
+
+    _lastSeenTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (_currentUserId != null) {
+        _dbService.updateUserLastSeen(_currentUserId!);
+      }
+    });
+  }
+
+  void _handleTyping() {
+    _chatChannel?.sendBroadcastMessage(
+      event: 'typing',
+      payload: {'user_id': _currentUserId},
+    );
   }
 
   void _scrollToBottom() {
@@ -67,28 +153,38 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
-  Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty || _currentUserId == null) {
-      return;
-    }
-
+  Future<void> _sendMessage({XFile? attachment}) async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty && attachment == null || _currentUserId == null) return;
+    setState(() => _isSending = true);
     try {
+      _messageController.clear();
       await _dbService.sendMessage(
         chatId: widget.chatId,
         senderId: _currentUserId!,
-        senderEmail: _currentUserEmail ?? '',
-        content: _messageController.text.trim(),
+        text: text.isEmpty ? null : text,
+        attachmentFile: attachment,
       );
-
-      _messageController.clear();
-
-      // Scroll to bottom after sending
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error sending message: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image =
+          await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      if (image != null) await _sendMessage(attachment: image);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -105,7 +201,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   ? NetworkImage(widget.otherUserProfileUrl!)
                   : null,
               child: widget.otherUserProfileUrl == null
-                  ? Text(widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : '?')
+                  ? Text(widget.otherUserName.isNotEmpty
+                      ? widget.otherUserName[0].toUpperCase()
+                      : '?')
                   : null,
             ),
             const SizedBox(width: 12),
@@ -113,10 +211,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(widget.otherUserName, style: const TextStyle(fontSize: 16)),
-                Text(
-                  widget.propertyName,
-                  style: const TextStyle(fontSize: 12, color: Colors.white70),
-                ),
+                _buildSubtitle(),
               ],
             ),
           ],
@@ -130,8 +225,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             child: StreamBuilder<List<Message>>(
               stream: _dbService.getChatMessages(widget.chatId),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator(color: primaryGreen));
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const Center(
+                      child: CircularProgressIndicator(color: primaryGreen));
                 }
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
@@ -139,10 +236,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 final messages = snapshot.data ?? [];
                 if (messages.isEmpty) {
                   return Center(
-                    child: Text('No messages yet. Start the conversation!', style: TextStyle(color: Colors.grey[600])),
-                  );
+                      child: Text('No messages yet!',
+                          style: TextStyle(color: Colors.grey[600])));
                 }
-                WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+
+                WidgetsBinding.instance
+                    .addPostFrameCallback((_) => _scrollToBottom());
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
@@ -150,67 +249,105 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   itemBuilder: (context, index) {
                     final message = messages[index];
                     final isMe = message.senderId == _currentUserId;
-                    return _buildMessageBubble(message, isMe);
+                    return MessageBubble(message: message, isMe: isMe);
                   },
                 );
               },
             ),
           ),
-          // --- Message Input Bar ---
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withAlpha((255 * 0.3).round()),
-                  spreadRadius: 1,
-                  blurRadius: 5,
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 8.0), // This adds the space at the bottom
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: InputDecoration(
-                        hintText: 'Type a message...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(25),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(25),
-                          borderSide: const BorderSide(color: primaryGreen, width: 2),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      ),
-                      maxLines: null,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    decoration: const BoxDecoration(color: primaryGreen, shape: BoxShape.circle),
-                    child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white),
-                      onPressed: _sendMessage,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _buildMessageInputBar(),
         ],
       ),
     );
   }
 
-  Widget _buildMessageBubble(Message message, bool isMe) {
+  Widget _buildSubtitle() {
+    if (_isOtherUserTyping) {
+      return const TypingIndicator();
+    }
+    if (_isOtherUserOnline) {
+      return const Row(
+        children: [
+          Icon(Icons.circle, color: Colors.greenAccent, size: 10),
+          SizedBox(width: 4),
+          Text("Online",
+              style: TextStyle(fontSize: 12, color: Colors.white70)),
+        ],
+      );
+    }
+    return Text(
+      widget.propertyName,
+      style: const TextStyle(fontSize: 12, color: Colors.white70),
+    );
+  }
+
+  Widget _buildMessageInputBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          boxShadow: [
+            BoxShadow(
+                color: Colors.grey.withAlpha(76),
+                spreadRadius: 1,
+                blurRadius: 5)
+          ]),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8.0),
+        child: Row(
+          children: [
+            IconButton(
+                icon: Icon(Icons.attach_file, color: Colors.grey[600]),
+                onPressed: _isSending ? null : _pickImage),
+            Expanded(
+              child: TextField(
+                controller: _messageController,
+                decoration: InputDecoration(
+                  hintText: 'Type a message...',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: BorderSide(color: Colors.grey[300]!)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide:
+                          const BorderSide(color: primaryGreen, width: 2)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+                maxLines: null,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _isSending ? null : _sendMessage(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            _isSending
+                ? const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: CircularProgressIndicator(color: primaryGreen))
+                : Container(
+                    decoration: const BoxDecoration(
+                        color: primaryGreen, shape: BoxShape.circle),
+                    child: IconButton(
+                        icon: const Icon(Icons.send, color: Colors.white),
+                        onPressed: _sendMessage),
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MessageBubble extends StatelessWidget {
+  final Message message;
+  final bool isMe;
+
+  const MessageBubble({super.key, required this.message, required this.isMe});
+
+  static const Color primaryGreen = Color(0xFF4CAF50);
+
+  @override
+  Widget build(BuildContext context) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -225,27 +362,90 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             bottomRight: Radius.circular(isMe ? 0 : 20),
           ),
         ),
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
         child: Column(
-          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment:
+              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Text(
-              message.content,
-              style: TextStyle(
-                color: isMe ? Colors.white : Colors.black87,
-                fontSize: 15,
-              ),
-            ),
+            _buildMessageContent(),
             const SizedBox(height: 4),
-            Text(
-              timeago.format(message.sentAt),
-              style: TextStyle(
-                color: isMe ? Colors.white70 : Colors.grey[600],
-                fontSize: 11,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  timeago.format(message.sentAt),
+                  style: TextStyle(
+                      color: isMe ? Colors.white70 : Colors.grey[600],
+                      fontSize: 11),
+                ),
+                if (isMe) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    message.readAt != null ? Icons.done_all : Icons.done,
+                    color:
+                        message.readAt != null ? Colors.blue[300] : Colors.white70,
+                    size: 16,
+                  ),
+                ],
+              ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMessageContent() {
+    if (message.attachmentType == MessageAttachmentType.image) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12.0),
+        child: FadeInImage.assetNetwork(
+          placeholder: 'assets/images/logo.png',
+          image: message.attachmentUrl!,
+          fit: BoxFit.cover,
+          imageErrorBuilder: (context, error, stackTrace) =>
+              const Icon(Icons.broken_image, color: Colors.white70),
+        ),
+      );
+    }
+    return Text(message.text ?? "File",
+        style:
+            TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 15));
+  }
+}
+
+class TypingIndicator extends StatefulWidget {
+  const TypingIndicator({super.key});
+  @override
+  State<TypingIndicator> createState() => _TypingIndicatorState();
+}
+
+class _TypingIndicatorState extends State<TypingIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _controller.drive(
+          Tween(begin: 0.5, end: 1.0).chain(CurveTween(curve: Curves.easeInOut))),
+      child: const Text("typing...",
+          style: TextStyle(fontSize: 12, color: Colors.white70)),
     );
   }
 }

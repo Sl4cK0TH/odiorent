@@ -17,8 +17,8 @@ class _ApprovedPropertiesListState extends State<ApprovedPropertiesList> {
   @override
   void initState() {
     super.initState();
-    _propertiesFuture =
-        _dbService.getPropertiesByStatusWithLandlordDetails('approved');
+    _propertiesFuture = _dbService
+        .getPropertiesByStatusWithLandlordDetails(PropertyStatus.approved);
   }
 
   @override
@@ -66,7 +66,8 @@ class _ApprovedPropertiesListState extends State<ApprovedPropertiesList> {
                       Text(
                         'Approved: ${DateFormat('MMM d, yyyy').format(property.approvedAt!)}',
                       ),
-                    Text('Status: ${property.status.toUpperCase()}'),
+                    Text(
+                        'Status: ${statusToString(property.status).toUpperCase()}'),
                     // Add more details as needed
                   ],
                 ),

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:odiorent/services/database_service.dart'; // Re-import DatabaseService
-// Removed: import 'package:odiorent/screens/shared/welcome_screen.dart'; // For sign out (no longer directly used here)
-import 'package:odiorent/widgets/admin-widgets/statistic_card.dart'; // Import StatisticCard
-import 'package:odiorent/screens/admin/admin_property_list_screen.dart'; // Import AdminPropertyListScreen
-import 'package:odiorent/screens/admin/admin_account_screen.dart'; // Import AdminAccountScreen
+import 'package:odiorent/models/property.dart';
+import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/widgets/admin-widgets/statistic_card.dart';
+import 'package:odiorent/screens/admin/admin_property_list_screen.dart';
+import 'package:odiorent/screens/admin/admin_account_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -15,64 +15,40 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  // --- Brand Colors (Green Palette) ---
   static const Color primaryGreen = Color(0xFF4CAF50);
   static const Color lightGreen = Color(0xFF66BB6A);
 
-  // Services
   final DatabaseService _dbService = DatabaseService();
-  // Removed: final AuthService _authService = AuthService(); // No longer directly used here
+  DateTime? lastPressed;
 
-  // A Future to hold the list of pending properties
-  // Removed: late Future<List<Property>> _pendingPropertiesFuture;
-  DateTime? lastPressed; // For double-tap to exit
+  int _selectedIndex = 0;
+  String? _selectedPropertyStatusFilter;
 
-  int _selectedIndex = 0; // To manage the selected tab
-  String? _selectedPropertyStatusFilter; // New: To store status from clicked card
-
-  // List of widgets to display for each tab
   List<Widget> get _widgetOptions => <Widget>[
-        // 0. Dashboard Tab
         _buildDashboardScreen(),
-
-        // 1. Properties Tab
         AdminPropertyListScreen(
-          status: _selectedPropertyStatusFilter ?? 'overall', // Pass filter
+          status: _selectedPropertyStatusFilter ?? 'overall',
           title: 'Properties',
         ),
-
-        // 2. Account Tab
-        const AdminAccountScreen(), // Use the new AdminAccountScreen
+        const AdminAccountScreen(),
       ];
 
-  // New: Function to handle statistic card tap and navigate to properties tab
   void _handleStatisticCardTap(String status) {
     setState(() {
       _selectedPropertyStatusFilter = status;
-      _selectedIndex = 1; // Navigate to Properties tab
+      _selectedIndex = 1;
     });
   }
 
-  // Handles tab selection
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-      // If navigating to properties tab, clear the filter
       if (index == 1) {
         _selectedPropertyStatusFilter = null;
-        // Removed: _refreshPendingList(); // Refresh the list if it's the properties tab
       }
     });
   }
 
-  // Removed: Function to refresh the list
-  // Removed: void _refreshPendingList() {
-  // Removed:   setState(() {
-  // Removed:     _pendingPropertiesFuture = _dbService.getPropertiesByStatusWithLandlordDetails('pending'); // Use new method
-  // Removed:   });
-  // Removed: }
-
-  // New: Widget for the Dashboard tab content
   Widget _buildDashboardScreen() {
     return FutureBuilder<Map<String, int>>(
       future: _fetchDashboardStats(),
@@ -98,7 +74,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2, // Two cards per row
+                crossAxisCount: 2,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
                 children: [
@@ -139,12 +115,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // New: Function to fetch all dashboard statistics
   Future<Map<String, int>> _fetchDashboardStats() async {
     final overall = await _dbService.getPropertiesCount();
-    final pending = await _dbService.getPropertiesCountByStatus('pending');
-    final approved = await _dbService.getPropertiesCountByStatus('approved');
-    final rejected = await _dbService.getPropertiesCountByStatus('rejected');
+    final pending = await _dbService.getPropertiesCountByStatus(PropertyStatus.pending);
+    final approved = await _dbService.getPropertiesCountByStatus(PropertyStatus.approved);
+    final rejected = await _dbService.getPropertiesCountByStatus(PropertyStatus.rejected);
 
     return {
       'overall': overall,
@@ -152,12 +127,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       'approved': approved,
       'rejected': rejected,
     };
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    // Removed: _widgetOptions = <Widget>[ ... ];
   }
 
   @override
@@ -175,29 +144,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
         if (isWarning) {
           lastPressed = DateTime.now();
-          Fluttertoast.showToast(
-            msg: "Press back again to exit",
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.black.withAlpha(179),
-            textColor: Colors.white,
-            fontSize: 16.0,
-          );
+          Fluttertoast.showToast(msg: "Press back again to exit");
         } else {
           SystemNavigator.pop();
         }
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text(
-            'Admin Dashboard', // Changed title
-            style: TextStyle(fontWeight: FontWeight.bold), // Made bold
-          ),
+          title: const Text('Admin Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: lightGreen,
           foregroundColor: Colors.white,
           automaticallyImplyLeading: false,
           actions: [
-            // Keep Notifications icon
             IconButton(
               icon: const Icon(Icons.notifications_outlined, color: Colors.white),
               onPressed: () {
@@ -206,36 +164,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ],
         ),
-        body: _widgetOptions.elementAt(_selectedIndex), // Display selected tab content
-        bottomNavigationBar: SizedBox(
-          height: 54.0, // Set fixed height
-          child: BottomNavigationBar(
-            items: const <BottomNavigationBarItem>[
-              BottomNavigationBarItem(
-                icon: Icon(Icons.dashboard),
-                label: '', // No label
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.assignment),
-                label: '', // No label
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: '', // No label
-              ),
-            ],
-            currentIndex: _selectedIndex,
-            selectedItemColor: primaryGreen,
-            unselectedItemColor: Colors.black, // Changed to black for visibility
-            onTap: _onItemTapped,
-            type: BottomNavigationBarType.fixed, // Ensures all items are visible
-            showSelectedLabels: false, // No labels
-            showUnselectedLabels: false, // No labels
-            enableFeedback: false, // No splash effect
-            iconSize: 28.0, // Set icon size
-            selectedFontSize: 0.0, // Crucial for fixing overflow with hidden labels
-            unselectedFontSize: 0.0, // Crucial for fixing overflow with hidden labels
-          ),
+        body: _widgetOptions.elementAt(_selectedIndex),
+        bottomNavigationBar: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+            BottomNavigationBarItem(icon: Icon(Icons.assignment), label: 'Properties'),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Account'),
+          ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: primaryGreen,
+          onTap: _onItemTapped,
         ),
       ),
     );

@@ -34,6 +34,14 @@ This project uses Supabase for its backend (database, authentication, etc.).
     -   Find the `supabase/schema.sql` file in this project's repository.
     -   Copy the entire content of the file.
     -   Paste the content into a new query in the SQL Editor and click **RUN**. This will set up all your tables, views, functions, and security policies.
+    -   **Enable pg_net Extension:** Run the following SQL to enable the pg_net extension for push notifications:
+        ```sql
+        CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
+        GRANT USAGE ON SCHEMA extensions TO postgres, anon, authenticated, service_role;
+        GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA extensions TO postgres, anon, authenticated, service_role;
+        ALTER DEFAULT PRIVILEGES IN SCHEMA extensions GRANT EXECUTE ON FUNCTIONS TO postgres, anon, authenticated, service_role;
+        ```
+    -   **Set up Message Trigger:** Find and run the `supabase/triggers/notify_on_new_message.sql` file in the SQL Editor.
 4.  **Get API Credentials:**
     -   Go to your project's **Settings > API**.
     -   You will need two values: the **Project URL** and the **Project API Keys (anon public key)**. Keep this page open.

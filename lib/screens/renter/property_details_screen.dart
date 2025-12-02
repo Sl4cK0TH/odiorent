@@ -66,23 +66,33 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
       final landlordId = _property.landlordId;
 
       // 3. Call the database service function to get or create chat
-      final chatId = await _dbService.getOrCreateChat(
+      final chatResult = await _dbService.getOrCreateChat(
         renterId: renterId,
         landlordId: landlordId,
         propertyId: _property.id!,
       );
 
+      final chatId = chatResult['chatId'] as String;
+      final isNewChat = chatResult['isNewChat'] as bool;
+
       setState(() => _isMessageLoading = false);
 
       // 4. Navigate to the chat room
       if (mounted) {
+        // Prepare initial message for new chats
+        final initialMessage = isNewChat
+            ? 'Hi! I\'m interested in "${_property.name}" at ${_property.address}. Is it still available?'
+            : null;
+
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => ChatRoomScreen(
               chatId: chatId,
               propertyName: _property.name,
               otherUserName: _formatFullName(_property),
-              // otherUserProfileUrl: _property.profile_picture_url, // This field doesn't exist on Property model
+              otherUserId: landlordId,
+              otherUserProfileUrl: _property.landlordProfilePicture,
+              initialMessage: initialMessage,
             ),
           ),
         );

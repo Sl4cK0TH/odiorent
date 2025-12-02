@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_core/firebase_core.dart'; // Import Firebase Core
 import 'package:odiorent/screens/splash_screen.dart';
 import 'package:odiorent/screens/renter/renter_home_screen.dart';
 import 'package:odiorent/screens/landlord/landlord_home_screen.dart';
@@ -7,8 +8,9 @@ import 'package:odiorent/screens/admin/admin_dashboard_screen.dart';
 
 Future<void> main() async {
   // This line is required to ensure Flutter is initialized
-  // before you call Supabase
+  // before you call Supabase or Firebase
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(); // Initialize Firebase
 
   // Initialize Supabase
   await Supabase.initialize(

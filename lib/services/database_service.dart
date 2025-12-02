@@ -1,7 +1,10 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:odiorent/models/property.dart'; // We need this to work with Property objects
-import 'package:odiorent/models/message.dart'; // For chat functionality
+import 'package:image_picker/image_picker.dart';
+import 'package:odiorent/models/message.dart';
+import 'package:odiorent/models/property.dart';
+import 'package:odiorent/services/storage_service.dart';
+import 'package:path/path.dart' as p;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Get the global Supabase client
 final supabase = Supabase.instance.client;
@@ -26,12 +29,14 @@ class DatabaseService {
     try {
       final propertyMap = property.toJson();
       // Insert the property and immediately select it back to get the generated ID
-      final newProperty = await supabase.from('properties').insert(propertyMap).select().single();
+      final newProperty =
+          await supabase.from('properties').insert(propertyMap).select().single();
       debugPrint("Property created successfully with ID: ${newProperty['id']}");
 
       // --- Create Notifications for all Admins ---
       // 1. Fetch all admin user IDs
-      final adminUsers = await supabase.from('profiles').select('id').eq('role', 'admin');
+      final adminUsers =
+          await supabase.from('profiles').select('id').eq('role', 'admin');
 
       // 2. Create a list of notification maps
       final notifications = (adminUsers as List).map((admin) {
@@ -50,7 +55,6 @@ class DatabaseService {
         debugPrint("Created ${notifications.length} notifications for admins.");
       }
       // --- End Notification ---
-
     } catch (e) {
       debugPrint("Error creating property: $e");
       rethrow;
@@ -72,7 +76,8 @@ class DatabaseService {
   Future<void> updateProperty(Property property) async {
     try {
       final propertyMap = property.toJson();
-      debugPrint("Updating property with ID: ${property.id}, Data: $propertyMap"); // Debugging line
+      debugPrint(
+          "Updating property with ID: ${property.id}, Data: $propertyMap"); // Debugging line
       // The property ID must not be null when updating.
       if (property.id == null) {
         throw Exception("Property ID cannot be null when updating.");
@@ -137,7 +142,8 @@ class DatabaseService {
           .map((json) => Property.fromMap(json as Map<String, dynamic>))
           .toList();
 
-      debugPrint("Fetched ${properties.length} overall properties with landlord details");
+      debugPrint(
+          "Fetched ${properties.length} overall properties with landlord details");
       return properties;
     } catch (e) {
       debugPrint("Error getting all properties with landlord details: $e");
@@ -147,22 +153,24 @@ class DatabaseService {
 
   /// --- GET PROPERTIES BY STATUS WITH LANDLORD DETAILS (Admin Function) ---
   Future<List<Property>> getPropertiesByStatusWithLandlordDetails(
-      String status) async {
+      PropertyStatus status) async {
     try {
       final response = await supabase
           .from('properties_with_avg_rating') // Use the new view
           .select('*')
-          .eq('status', status)
+          .eq('status', statusToString(status))
           .order('created_at', ascending: false);
 
       final properties = (response as List<dynamic>)
           .map((json) => Property.fromMap(json as Map<String, dynamic>))
           .toList();
 
-      debugPrint("Fetched ${properties.length} $status properties with landlord details");
+      debugPrint(
+          "Fetched ${properties.length} ${statusToString(status)} properties with landlord details");
       return properties;
     } catch (e) {
-      debugPrint("Error getting $status properties with landlord details: $e");
+      debugPrint(
+          "Error getting ${statusToString(status)} properties with landlord details: $e");
       return [];
     }
   }
@@ -170,19 +178,14 @@ class DatabaseService {
   /// --- UPDATE PROPERTY STATUS (Admin Function) ---
   Future<void> updatePropertyStatus({
     required String propertyId,
-    required String status,
+    required PropertyStatus status,
     required String landlordId,
     required String propertyName,
   }) async {
     try {
-      if (status != 'approved' && status != 'rejected' && status != 'pending') {
-        throw Exception(
-          'Invalid status. Must be "approved", "rejected", or "pending"',
-        );
-      }
-
-      final Map<String, dynamic> updateData = {'status': status};
-      if (status == 'approved') {
+      final statusString = statusToString(status);
+      final Map<String, dynamic> updateData = {'status': statusString};
+      if (status == PropertyStatus.approved) {
         updateData['approved_at'] = DateTime.now().toIso8601String();
       } else {
         updateData['approved_at'] =
@@ -193,7 +196,7 @@ class DatabaseService {
 
       // --- Create Notification for Landlord ---
       final notificationBody =
-          'Your property "$propertyName" has been ${status == 'approved' ? 'Approved' : 'Rejected'}.';
+          'Your property "$propertyName" has been ${statusString == 'approved' ? 'Approved' : 'Rejected'}.';
       await supabase.from('notifications').insert({
         'recipient_id': landlordId,
         'title': 'Property Status Update',
@@ -201,7 +204,7 @@ class DatabaseService {
       });
       // --- End Notification ---
 
-      debugPrint("Property $propertyId status updated to: $status");
+      debugPrint("Property $propertyId status updated to: $statusString");
     } catch (e) {
       debugPrint("Error updating property status: $e");
       rethrow;
@@ -225,10 +228,13 @@ class DatabaseService {
       if (lastName != null) updates['last_name'] = lastName;
       if (phoneNumber != null) updates['phone_number'] = phoneNumber;
       if (userName != null) updates['user_name'] = userName;
-      if (profilePictureUrl != null) updates['profile_picture_url'] = profilePictureUrl;
+      if (profilePictureUrl != null) {
+        updates['profile_picture_url'] = profilePictureUrl;
+      }
 
       if (updates.isNotEmpty) {
-        debugPrint("Attempting to update profile for user $userId with data: $updates");
+        debugPrint(
+            "Attempting to update profile for user $userId with data: $updates");
         await supabase.from('profiles').update(updates).eq('id', userId);
         debugPrint("✅ Profile update successful for user $userId");
       }
@@ -238,8 +244,34 @@ class DatabaseService {
     }
   }
 
+  /// --- UPDATE USER LAST SEEN (for Online Presence) ---
+  Future<void> updateUserLastSeen(String userId) async {
+    try {
+      await supabase
+          .from('profiles')
+          .update({'last_seen': DateTime.now().toIso8601String()})
+          .eq('id', userId);
+    } catch (e) {
+      // Fail silently, as this is not a critical operation
+      debugPrint("Error updating user last_seen: $e");
+    }
+  }
+
+  /// --- SAVE FCM TOKEN (for Push Notifications) ---
+  Future<void> saveFcmToken(String token, String userId) async {
+    try {
+      await supabase.from('fcm_tokens').upsert({
+        'user_id': userId,
+        'token': token,
+      }, onConflict: 'token');
+    } catch (e) {
+      debugPrint("Error saving FCM token: $e");
+    }
+  }
+
   /// --- GET PROPERTY WITH LANDLORD DETAILS (Renter Function) ---
-  Future<Map<String, dynamic>> getPropertyWithLandlordDetails(String propertyId) async {
+  Future<Map<String, dynamic>> getPropertyWithLandlordDetails(
+      String propertyId) async {
     try {
       final response = await supabase
           .from('properties_with_avg_rating') // Use the new view
@@ -302,7 +334,8 @@ class DatabaseService {
         'rating': rating,
         'comment': comment,
       }, onConflict: 'unique_user_property_rating'); // Use upsert to handle updates
-      debugPrint("Rating added/updated successfully for property $propertyId by user $userId");
+      debugPrint(
+          "Rating added/updated successfully for property $propertyId by user $userId");
     } catch (e) {
       debugPrint("Error adding/updating rating: $e");
       rethrow;
@@ -312,10 +345,8 @@ class DatabaseService {
   /// --- GET ALL PROPERTIES COUNT (Admin Function) ---
   Future<int> getPropertiesCount() async {
     try {
-      final response = await supabase
-          .from('properties')
-          .select('count')
-          .single(); // Use .single() to get the count directly
+      final response =
+          await supabase.from('properties').select('count').single();
 
       return response['count'] as int;
     } catch (e) {
@@ -326,25 +357,27 @@ class DatabaseService {
 
   /// --- GET PROPERTIES COUNT BY STATUS (Admin Function) ---
   /// Fetches the number of properties with a specific status.
-  Future<int> getPropertiesCountByStatus(String status) async {
+  Future<int> getPropertiesCountByStatus(PropertyStatus status) async {
     try {
       final response = await supabase
           .from('properties')
           .select('count')
-          .eq('status', status)
-          .single(); // Use .single() to get the count directly
+          .eq('status', statusToString(status))
+          .single();
 
       return response['count'] as int;
     } catch (e) {
-      debugPrint("Error getting properties count by status '$status': $e");
+      debugPrint(
+          "Error getting properties count by status '${statusToString(status)}': $e");
       return 0;
     }
   }
 
-  // ========== CHAT FUNCTIONS (Day 6) ==========
+  // ========== CHAT FUNCTIONS (Day 6, Updated for Multimedia) ==========
 
   /// Get or create a chat between renter and landlord for a specific property
-  Future<String> getOrCreateChat({
+  /// Returns a map with 'chatId' and 'isNewChat' keys
+  Future<Map<String, dynamic>> getOrCreateChat({
     required String renterId,
     required String landlordId,
     required String propertyId,
@@ -355,31 +388,31 @@ class DatabaseService {
       // Check if chat already exists
       final existingChat = await supabase
           .from('chats')
-          .select()
-          .eq('renter_id', renterId)
-          .eq('landlord_id', landlordId)
-          .eq('property_id', propertyId)
+          .select('id')
+          .or(
+              'and(renter_id.eq.$renterId,landlord_id.eq.$landlordId,property_id.eq.$propertyId),and(renter_id.eq.$landlordId,landlord_id.eq.$renterId,property_id.eq.$propertyId)')
           .maybeSingle();
 
       if (existingChat != null) {
         debugPrint("Chat already exists: ${existingChat['id']}");
-        return existingChat['id'].toString();
+        return {
+          'chatId': existingChat['id'].toString(),
+          'isNewChat': false,
+        };
       }
 
       // Create new chat
-      final newChat = await supabase
-          .from('chats')
-          .insert({
-            'renter_id': renterId,
-            'landlord_id': landlordId,
-            'property_id': propertyId,
-            'created_at': DateTime.now().toIso8601String(),
-          })
-          .select()
-          .single();
+      final newChat = await supabase.from('chats').insert({
+        'renter_id': renterId,
+        'landlord_id': landlordId,
+        'property_id': propertyId,
+      }).select('id').single();
 
       debugPrint("Created new chat: ${newChat['id']}");
-      return newChat['id'].toString();
+      return {
+        'chatId': newChat['id'].toString(),
+        'isNewChat': true,
+      };
     } catch (e) {
       debugPrint("Error getting or creating chat: $e");
       rethrow;
@@ -394,13 +427,15 @@ class DatabaseService {
       final chats = await supabase
           .from('chats')
           .select('''
-            *,
-            properties:property_id (name, address, image_urls),
-            renter:renter_id (email),
-            landlord:landlord_id (email)
+            id,
+            last_message,
+            last_message_at,
+            property:properties (name, address, image_urls),
+            participant_1:renter_id (id, user_name, first_name, last_name, profile_picture_url),
+            participant_2:landlord_id (id, user_name, first_name, last_name, profile_picture_url)
           ''')
           .or('renter_id.eq.$userId,landlord_id.eq.$userId')
-          .order('created_at', ascending: false);
+          .order('last_message_at', ascending: false);
 
       debugPrint("Fetched ${chats.length} chats");
       return List<Map<String, dynamic>>.from(chats);
@@ -410,7 +445,7 @@ class DatabaseService {
     }
   }
 
-  /// Get messages for a specific chat
+  /// Get messages for a specific chat, including read status
   Stream<List<Message>> getChatMessages(String chatId) {
     debugPrint("Setting up message stream for chat: $chatId");
 
@@ -425,31 +460,67 @@ class DatabaseService {
         });
   }
 
-  /// Send a message in a chat
+  /// Send a message in a chat (text or attachment)
   Future<void> sendMessage({
     required String chatId,
     required String senderId,
-    required String senderEmail,
-    required String content,
+    String? text,
+    XFile? attachmentFile,
   }) async {
     try {
       debugPrint("Sending message to chat: $chatId");
 
+      if (text == null && attachmentFile == null) {
+        throw Exception("Message must have either text or an attachment.");
+      }
+
+      String? attachmentUrl;
+      MessageAttachmentType? attachmentType;
+      String lastMessageText = text ?? "Sent an attachment";
+
+      // 1. Handle attachment upload if present
+      if (attachmentFile != null) {
+        final storageService = StorageService();
+        final fileBytes = await attachmentFile.readAsBytes();
+        final fileExt = p.extension(attachmentFile.name);
+        final fileName = '${DateTime.now().toIso8601String()}$fileExt';
+
+        // For now, we'll classify based on common image extensions
+        if (['.png', '.jpg', '.jpeg', '.gif', '.webp']
+            .contains(fileExt.toLowerCase())) {
+          attachmentType = MessageAttachmentType.image;
+          lastMessageText = "Sent an image";
+        } else {
+          attachmentType = MessageAttachmentType.file;
+          lastMessageText = "Sent a file";
+        }
+
+        attachmentUrl = await storageService.uploadFile(
+          bucket: 'chat_attachments', // Use a dedicated bucket for chat files
+          bytes: fileBytes,
+          fileName: fileName,
+          userId: senderId, // Organize attachments by sender
+        );
+      }
+
+      // 2. Create the message object
       final message = Message(
         chatId: chatId,
         senderId: senderId,
-        senderEmail: senderEmail,
-        content: content,
+        text: text,
         sentAt: DateTime.now(),
+        attachmentUrl: attachmentUrl,
+        attachmentType: attachmentType,
       );
 
+      // 3. Insert the message into the database
       await supabase.from('messages').insert(message.toMap());
 
-      // Update chat's last_message_at
-      await supabase
-          .from('chats')
-          .update({'last_message_at': DateTime.now().toIso8601String()})
-          .eq('id', chatId);
+      // 4. Update the chat's last message details
+      await supabase.from('chats').update({
+        'last_message_at': DateTime.now().toIso8601String(),
+        'last_message': lastMessageText,
+      }).eq('id', chatId);
 
       debugPrint("Message sent successfully");
     } catch (e) {
@@ -457,4 +528,21 @@ class DatabaseService {
       rethrow;
     }
   }
+
+  /// --- MARK MESSAGES AS READ (for Read Receipts) ---
+  Future<void> markMessagesAsRead(String chatId, String userId) async {
+    try {
+      await supabase
+          .from('messages')
+          .update({'read_at': DateTime.now().toIso8601String()})
+          .eq('chat_id', chatId)
+          .neq('sender_id', userId)
+          .filter('read_at', 'is', null); // Corrected syntax
+    } catch (e) {
+      debugPrint("Error marking messages as read: $e");
+    }
+  }
 }
+
+
+      

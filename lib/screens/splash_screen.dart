@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 // 1. --- Import all the screens we need to navigate to ---
 import 'package:odiorent/screens/shared/welcome_screen.dart';
 import 'package:odiorent/services/auth_service.dart';
+import 'package:odiorent/services/push_notification_service.dart';
 import 'package:odiorent/screens/renter/renter_home_screen.dart';
 import 'package:odiorent/screens/landlord/landlord_home_screen.dart';
 import 'package:odiorent/screens/admin/admin_dashboard_screen.dart';
@@ -69,6 +70,11 @@ class _SplashScreenState extends State<SplashScreen>
       _navigateTo(const WelcomeScreen());
     } else {
       // --- Case 2: A user is logged in ---
+      // Initialize Push Notification Service
+      // We do this here because we need the user's ID.
+      // This is a "fire-and-forget" call.
+      PushNotificationService().init(currentUser.id);
+      
       // Get their role from our 'profiles' table
       final role = await _authService.getRole(currentUser.id);
 

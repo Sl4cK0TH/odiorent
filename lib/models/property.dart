@@ -1,3 +1,29 @@
+// New ENUM for property status to match the database ENUM.
+// This improves type safety and prevents invalid status values.
+enum PropertyStatus {
+  pending,
+  approved,
+  rejected,
+}
+
+// Helper function to convert a string to a PropertyStatus enum value.
+PropertyStatus statusFromString(String status) {
+  switch (status) {
+    case 'approved':
+      return PropertyStatus.approved;
+    case 'rejected':
+      return PropertyStatus.rejected;
+    case 'pending':
+    default:
+      return PropertyStatus.pending;
+  }
+}
+
+// Helper function to convert a PropertyStatus enum value to a string.
+String statusToString(PropertyStatus status) {
+  return status.toString().split('.').last;
+}
+
 class Property {
   // --- Class Fields ---
 
@@ -16,7 +42,7 @@ class Property {
   // 'image_urls' is a text array in Supabase, which maps to List<String>
   final List<String> imageUrls;
 
-  final String status; // 'pending', 'approved', or 'rejected'
+  final PropertyStatus status; // Use the enum instead of String
   final DateTime createdAt; // New: Date when the property was created
   final DateTime? approvedAt; // New: Date when the property was approved (nullable)
 
@@ -27,6 +53,7 @@ class Property {
   final String? landlordLastName;
   final String? landlordUsername;
   final String? landlordPhoneNumber;
+  final String? landlordProfilePicture;
 
   // New: Rating details (populated from the 'properties_with_avg_rating' view)
   final double averageRating;
@@ -52,6 +79,7 @@ class Property {
     this.landlordLastName,
     this.landlordUsername,
     this.landlordPhoneNumber,
+    this.landlordProfilePicture,
     this.averageRating = 0.0, // New
     this.ratingCount = 0, // New
   });
@@ -71,7 +99,7 @@ class Property {
       'rooms': rooms,
       'beds': beds,
       'image_urls': imageUrls,
-      'status': status,
+      'status': statusToString(status), // Convert enum to string
       'created_at': createdAt.toIso8601String(), // Include created_at
       'approved_at': approvedAt?.toIso8601String(), // Include approved_at if not null
     };
@@ -91,7 +119,7 @@ class Property {
       rooms: json['rooms'] as int,
       beds: json['beds'] as int,
       imageUrls: List<String>.from(json['image_urls'] as List<dynamic>),
-      status: json['status'] as String,
+      status: statusFromString(json['status'] as String), // Convert string to enum
       createdAt: DateTime.parse(json['created_at'] as String),
       approvedAt: json['approved_at'] != null
           ? DateTime.parse(json['approved_at'] as String)
@@ -102,6 +130,7 @@ class Property {
       landlordLastName: json['last_name'] as String?,
       landlordUsername: json['user_name'] as String?,
       landlordPhoneNumber: json['phone_number'] as String?,
+      landlordProfilePicture: json['profile_picture_url'] as String?,
       averageRating: (json['average_rating'] as num? ?? 0.0).toDouble(),
       ratingCount: json['rating_count'] as int? ?? 0,
     );

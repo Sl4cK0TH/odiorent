@@ -12,7 +12,6 @@ class AdminPropertyViewScreen extends StatefulWidget {
 }
 
 class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
-  // --- Brand Colors (Green Palette) ---
   static const Color primaryGreen = Color(0xFF4CAF50);
   static const Color lightGreen = Color(0xFF66BB6A);
   static const Color darkGreen = Color(0xFF388E3C);
@@ -20,12 +19,10 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
   final DatabaseService _dbService = DatabaseService();
   bool _isLoading = false;
 
-  // --- Handle Action Button Press ---
-  Future<void> _handleUpdateStatus(String newStatus) async {
+  Future<void> _handleUpdateStatus(PropertyStatus newStatus) async {
     setState(() => _isLoading = true);
 
     try {
-      // Call the database service
       await _dbService.updatePropertyStatus(
         propertyId: widget.property.id!,
         status: newStatus,
@@ -35,19 +32,16 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
 
       if (!mounted) return;
 
-      // Show a success snackbar
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Property has been $newStatus.'),
-          backgroundColor: newStatus == 'approved' ? primaryGreen : Colors.red,
+          content: Text('Property has been ${statusToString(newStatus)}.'),
+          backgroundColor: newStatus == PropertyStatus.approved ? primaryGreen : Colors.red,
         ),
       );
 
-      // Pop the screen and return 'true' to signal a refresh
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      // Show an error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString()}'),
@@ -73,7 +67,6 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Image Carousel ---
             SizedBox(
               height: 250,
               child: PageView.builder(
@@ -95,14 +88,11 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
                 },
               ),
             ),
-
-            // --- Details Section ---
             Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- Price ---
                   Text(
                     '₱${widget.property.price.toStringAsFixed(2)} / month',
                     style: const TextStyle(
@@ -112,8 +102,6 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-
-                  // --- Name ---
                   Text(
                     widget.property.name,
                     style: const TextStyle(
@@ -122,8 +110,6 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-
-                  // --- Address ---
                   Row(
                     children: [
                       Icon(
@@ -144,8 +130,6 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // --- Room/Bed Stats ---
                   Row(
                     children: [
                       _buildStatChip(Icons.bed, '${widget.property.beds} Beds'),
@@ -157,8 +141,6 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-
-                  // --- Description ---
                   const Text(
                     'Description',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -169,8 +151,6 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
                     style: TextStyle(fontSize: 16, height: 1.5),
                   ),
                   const SizedBox(height: 32),
-
-                  // --- Action Buttons ---
                   if (_isLoading)
                     const Center(
                       child: CircularProgressIndicator(color: primaryGreen),
@@ -178,7 +158,6 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
                   else
                     Row(
                       children: [
-                        // --- REJECT BUTTON ---
                         Expanded(
                           child: OutlinedButton.icon(
                             icon: const Icon(Icons.close),
@@ -188,11 +167,10 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
                               side: const BorderSide(color: Colors.red),
                               padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
-                            onPressed: () => _handleUpdateStatus('rejected'),
+                            onPressed: () => _handleUpdateStatus(PropertyStatus.rejected),
                           ),
                         ),
                         const SizedBox(width: 16),
-                        // --- APPROVE BUTTON ---
                         Expanded(
                           child: ElevatedButton.icon(
                             icon: const Icon(Icons.check),
@@ -202,7 +180,7 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
-                            onPressed: () => _handleUpdateStatus('approved'),
+                            onPressed: () => _handleUpdateStatus(PropertyStatus.approved),
                           ),
                         ),
                       ],
@@ -216,7 +194,6 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
     );
   }
 
-  // Helper widget for the stat chips (beds, rooms)
   Widget _buildStatChip(IconData icon, String label) {
     return Chip(
       avatar: Icon(icon, size: 18, color: darkGreen),

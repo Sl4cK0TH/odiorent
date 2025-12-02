@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "147852764562",
+    "project_id": "odiorent-notifications",
+    "storage_bucket": "odiorent-notifications.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:147852764562:android:26c7c09cb1c5298f538d4b",
+        "android_client_info": {
+          "package_name": "com.example.odiorent"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBAn_l7AmRlMfpCypmbRsuuGrcHtQuCE-I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
