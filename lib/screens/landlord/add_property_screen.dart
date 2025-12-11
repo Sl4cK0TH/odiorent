@@ -87,7 +87,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final String? userId = _authService.getCurrentUser()?.id;
+      final String? userId = _authService.getCurrentUser()?.uid;
       if (userId == null) {
         throw Exception("User not logged in.");
       }

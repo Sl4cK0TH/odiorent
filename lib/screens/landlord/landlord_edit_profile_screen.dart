@@ -83,7 +83,7 @@ class _LandlordEditProfileScreenState extends State<LandlordEditProfileScreen> {
 
     try {
       if (_newProfileImageBytes != null) {
-        final userId = _authService.getCurrentUser()!.id;
+        final userId = _authService.getCurrentUser()!.uid;
         final fileName = 'profile_$userId${p.extension(_currentUserProfile?.profilePictureUrl ?? '.png')}'; // Use path.extension
         finalProfilePictureUrl = await _storageService.uploadFile(
           folder: 'profile_pictures',

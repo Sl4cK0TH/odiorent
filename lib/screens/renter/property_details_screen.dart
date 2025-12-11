@@ -47,7 +47,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
 
     try {
       // 1. Get current renter's ID
-      final renterId = _authService.getCurrentUser()?.id;
+      final renterId = _authService.getCurrentUser()?.uid;
       if (renterId == null) {
         // Handle user not found
         setState(() => _isMessageLoading = false);

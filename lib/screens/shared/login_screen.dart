@@ -93,8 +93,8 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception('User is null after successful login');
       }
 
-      debugPrint("Getting user role for ID: ${user.id}");
-      final role = await authService.getRole(user.id);
+      debugPrint("Getting user role for ID: ${user.uid}");
+      final role = await authService.getRole(user.uid);
       debugPrint("User role: $role");
 
       if (!mounted) return;

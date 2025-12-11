@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:odiorent/models/admin_user.dart';
 
 /// Firebase Authentication Service
 /// Replaces Supabase Auth with Firebase Auth

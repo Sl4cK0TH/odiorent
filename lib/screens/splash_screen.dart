@@ -73,10 +73,10 @@ class _SplashScreenState extends State<SplashScreen>
       // Initialize Push Notification Service
       // We do this here because we need the user's ID.
       // This is a "fire-and-forget" call.
-      PushNotificationService().init(currentUser.id);
+      PushNotificationService().init(currentUser.uid);
       
       // Get their role from our 'profiles' table
-      final role = await _authService.getRole(currentUser.id);
+      final role = await _authService.getRole(currentUser.uid);
 
       if (!mounted) return; // Check again after the async call
 

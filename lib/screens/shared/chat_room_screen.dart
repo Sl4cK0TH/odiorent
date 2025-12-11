@@ -81,7 +81,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   void _loadCurrentUserAndSetup() {
     final user = _authService.getCurrentUser();
     if (user != null) {
-      _currentUserId = user.id;
+      _currentUserId = user.uid;
       _setupChatChannel();
       setState(() {});
     }

@@ -59,7 +59,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
       final adminUser = await _authService.getAdminUserProfile();
       if (mounted) {
         setState(() {
-          _currentUserId = user.id;
+          _currentUserId = user.uid;
           _adminUser = adminUser;
           _userName = adminUser?.userName ?? user.email?.split('@')[0] ?? 'Landlord';
           _userProfileImage = adminUser?.profilePictureUrl != null
@@ -71,7 +71,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   }
 
   Future<void> _refreshProperties() async {
-    final String? userId = _authService.getCurrentUser()?.id;
+    final String? userId = _authService.getCurrentUser()?.uid;
     final future = userId != null
         ? _dbService.getLandlordProperties(userId)
         : Future.value(<Property>[]);

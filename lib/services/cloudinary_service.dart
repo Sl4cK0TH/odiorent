@@ -152,14 +152,21 @@ class CloudinaryService {
   /// Extract public_id from URL: 
   /// https://res.cloudinary.com/cloud_name/image/upload/v1234567890/folder/file.jpg
   /// public_id = folder/file
+  /// NOTE: Cloudinary free tier doesn't support API deletion
+  /// Files can be deleted manually from Cloudinary dashboard
   Future<void> deleteFile(String publicId) async {
     try {
-      await _cloudinary.deleteFile(
-        url: publicId,
-        resourceType: CloudinaryResourceType.Image,
-        invalidate: true,
-      );
-      debugPrint('✅ File deleted from Cloudinary: $publicId');
+      // TODO: Cloudinary free tier API doesn't support deleteFile method
+      // For now, files need to be deleted manually from dashboard
+      // Or upgrade to paid plan for API deletion
+      debugPrint('ℹ️ File deletion not supported in free tier: $publicId');
+      debugPrint('ℹ️ Please delete manually from Cloudinary dashboard if needed');
+      
+      // await _cloudinary.deleteFile(
+      //   url: publicId,
+      //   resourceType: CloudinaryResourceType.Image,
+      //   invalidate: true,
+      // );
     } catch (e) {
       debugPrint('❌ Error deleting from Cloudinary: $e');
       // Don't throw - file might already be deleted

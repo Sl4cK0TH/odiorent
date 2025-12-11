@@ -36,9 +36,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
     });
 
     try {
-      final chatsData = await _dbService.getUserChats(user.id);
+      final chatsData = await _dbService.getUserChats(user.uid);
       setState(() {
-        _chats = chatsData.map((data) => Chat.fromMap(data, user.id)).toList();
+        _chats = chatsData.map((data) => Chat.fromMap(data, user.uid)).toList();
         _isLoading = false;
       });
     } catch (e) {
