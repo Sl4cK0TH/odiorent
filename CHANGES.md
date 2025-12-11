@@ -36,6 +36,16 @@
   - ✅ `lib/models/admin_user.dart`: Added `toFirestore()`, `fromFirestore()`
   - All models preserve backward compatibility with existing `fromMap()`/`toMap()` methods
 
+### App Initialization & Auth Screens Updated
+- **[$(date '+%I:%M %p')]** Updated `lib/main.dart`:
+  - Firebase initialized with `DefaultFirebaseOptions.currentPlatform`
+  - Supabase kept temporarily for backward compatibility during migration
+  
+- **[$(date '+%I:%M %p')]** Updated authentication screens to use FirebaseAuthService:
+  - ✅ `lib/screens/shared/login_screen.dart`: Now uses FirebaseAuthService
+  - ✅ `lib/screens/shared/signup_screen.dart`: Now uses FirebaseAuthService
+  - ✅ `lib/screens/splash_screen.dart`: Now uses FirebaseAuthService for auto-login
+
 ---
 
 ## December 2, 2025
