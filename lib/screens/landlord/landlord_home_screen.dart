@@ -681,22 +681,6 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
     );
   }
 
-  void _showComingSoonDialog(String feature) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(feature),
-        content: Text('$feature feature coming soon!'),
-        actions: [
-          TextButton(
-            child: const Text('OK'),
-            onPressed: () => Navigator.of(ctx).pop(),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _handleLogout() async {
     final confirm = await showDialog<bool>(
       context: context,

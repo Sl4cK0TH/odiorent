@@ -61,6 +61,7 @@ class _AdminPropertyListScreenState extends State<AdminPropertyListScreen>
         title: Text(widget.title),
         backgroundColor: const Color(0xFF66BB6A), // lightGreen
         foregroundColor: Colors.white,
+        automaticallyImplyLeading: false, // Remove back button
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

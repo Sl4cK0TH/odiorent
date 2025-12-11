@@ -45,3 +45,7 @@ app.*.map.json
 /android/app/release
 odiorent-notifications-f75f68526b18.json
 odiorent-notifications-f75f68526b18.json
+
+# Firebase Service Account Keys (NEVER COMMIT THESE)
+serviceAccountKey.json
+*-firebase-adminsdk-*.json

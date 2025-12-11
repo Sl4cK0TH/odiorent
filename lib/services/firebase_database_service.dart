@@ -166,12 +166,26 @@ class FirebaseDatabaseService {
   /// --- GET APPROVED PROPERTIES (with client-side search) ---
   Future<List<Property>> getApprovedProperties({String? searchQuery}) async {
     try {
-      var query = _firestore
-          .collection('properties')
-          .where('status', isEqualTo: 'approved')
-          .orderBy('createdAt', descending: true);
-
-      final querySnapshot = await query.get();
+      QuerySnapshot querySnapshot;
+      
+      try {
+        // Try query with orderBy (requires composite index)
+        querySnapshot = await _firestore
+            .collection('properties')
+            .where('status', isEqualTo: 'approved')
+            .orderBy('createdAt', descending: true)
+            .get();
+        debugPrint("✅ Using indexed query for approved properties");
+      } catch (e) {
+        // Fallback: query without orderBy if index doesn't exist
+        debugPrint("⚠️ Index missing for approved+createdAt, using fallback query");
+        debugPrint("   Create index: https://console.firebase.google.com/project/_/firestore/indexes");
+        querySnapshot = await _firestore
+            .collection('properties')
+            .where('status', isEqualTo: 'approved')
+            .get();
+        debugPrint("⚠️ Using fallback query (no ordering): ${querySnapshot.docs.length} docs");
+      }
 
       List<Property> properties = await Future.wait(
         querySnapshot.docs.map((doc) async {
@@ -179,6 +193,9 @@ class FirebaseDatabaseService {
           return await _enrichPropertyWithLandlordDetails(property);
         }).toList(),
       );
+
+      // Sort manually if using fallback or after filtering
+      properties.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       // Client-side filtering if search query provided
       if (searchQuery != null && searchQuery.isNotEmpty) {
@@ -253,11 +270,26 @@ class FirebaseDatabaseService {
       PropertyStatus status) async {
     try {
       final statusString = statusToString(status);
-      final querySnapshot = await _firestore
-          .collection('properties')
-          .where('status', isEqualTo: statusString)
-          .orderBy('createdAt', descending: true)
-          .get();
+      QuerySnapshot querySnapshot;
+      
+      try {
+        // Try query with orderBy (requires composite index)
+        querySnapshot = await _firestore
+            .collection('properties')
+            .where('status', isEqualTo: statusString)
+            .orderBy('createdAt', descending: true)
+            .get();
+        debugPrint("✅ Using indexed query for $statusString properties");
+      } catch (e) {
+        // Fallback: query without orderBy if index doesn't exist
+        debugPrint("⚠️ Index missing for status+createdAt, using fallback query");
+        debugPrint("   Create index: https://console.firebase.google.com/project/_/firestore/indexes");
+        querySnapshot = await _firestore
+            .collection('properties')
+            .where('status', isEqualTo: statusString)
+            .get();
+        debugPrint("⚠️ Using fallback query (no ordering): ${querySnapshot.docs.length} docs");
+      }
 
       final properties = await Future.wait(
         querySnapshot.docs.map((doc) async {
@@ -265,6 +297,9 @@ class FirebaseDatabaseService {
           return await _enrichPropertyWithLandlordDetails(property);
         }).toList(),
       );
+
+      // Sort manually if using fallback query
+      properties.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       debugPrint("✅ Fetched ${properties.length} $statusString properties");
       return properties;
@@ -406,10 +441,15 @@ class FirebaseDatabaseService {
   Future<void> addPropertyRating({
     required String propertyId,
     required String userId,
-    required int rating,
+    int? rating,
     String? comment,
   }) async {
     try {
+      // At least one of rating or comment must be provided
+      if (rating == null && (comment == null || comment.isEmpty)) {
+        throw Exception('Either rating or comment must be provided');
+      }
+
       // Use userId as document ID for upsert behavior (one rating per user per property)
       await _firestore
           .collection('properties')
@@ -423,10 +463,12 @@ class FirebaseDatabaseService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Recalculate average rating
-      await _recalculatePropertyRating(propertyId);
+      // Recalculate average rating only if rating was provided
+      if (rating != null) {
+        await _recalculatePropertyRating(propertyId);
+      }
 
-      debugPrint("✅ Rating added/updated for property $propertyId by user $userId");
+      debugPrint("✅ Rating/review added/updated for property $propertyId by user $userId");
     } catch (e) {
       debugPrint("❌ Error adding/updating rating: $e");
       rethrow;
@@ -451,20 +493,95 @@ class FirebaseDatabaseService {
       }
 
       double total = 0;
+      int ratingCount = 0;
+      
       for (var doc in ratingsSnapshot.docs) {
-        total += (doc.data()['rating'] as num).toDouble();
+        final rating = doc.data()['rating'] as num?;
+        if (rating != null) {
+          total += rating.toDouble();
+          ratingCount++;
+        }
       }
 
-      final average = total / ratingsSnapshot.docs.length;
+      final average = ratingCount > 0 ? total / ratingCount : 0.0;
 
       await _firestore.collection('properties').doc(propertyId).update({
         'averageRating': average,
-        'ratingCount': ratingsSnapshot.docs.length,
+        'ratingCount': ratingCount,
       });
 
-      debugPrint("✅ Updated property rating: $average (${ratingsSnapshot.docs.length} ratings)");
+      debugPrint("✅ Updated property rating: $average ($ratingCount ratings)");
     } catch (e) {
       debugPrint("❌ Error recalculating property rating: $e");
+    }
+  }
+
+  /// --- GET PROPERTY RATINGS ---
+  Future<List<Map<String, dynamic>>> getPropertyRatings(String propertyId) async {
+    try {
+      final ratingsSnapshot = await _firestore
+          .collection('properties')
+          .doc(propertyId)
+          .collection('ratings')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      final ratings = await Future.wait(
+        ratingsSnapshot.docs.map((doc) async {
+          final data = doc.data();
+          final userId = data['userId'] as String;
+
+          // Get user details
+          final userDoc = await _firestore.collection('users').doc(userId).get();
+          final userData = userDoc.exists ? userDoc.data() : null;
+
+          return {
+            'id': doc.id,
+            'rating': data['rating'],
+            'comment': data['comment'],
+            'createdAt': data['createdAt'],
+            'userName': userData?['userName'],
+            'firstName': userData?['firstName'],
+            'lastName': userData?['lastName'],
+            'profilePictureUrl': userData?['profilePictureUrl'],
+          };
+        }).toList(),
+      );
+
+      debugPrint("✅ Fetched ${ratings.length} ratings for property $propertyId");
+      return ratings;
+    } catch (e) {
+      debugPrint("❌ Error getting property ratings: $e");
+      return [];
+    }
+  }
+
+  /// --- GET USER'S RATING FOR PROPERTY ---
+  Future<Map<String, dynamic>?> getUserRatingForProperty({
+    required String propertyId,
+    required String userId,
+  }) async {
+    try {
+      final doc = await _firestore
+          .collection('properties')
+          .doc(propertyId)
+          .collection('ratings')
+          .doc(userId)
+          .get();
+
+      if (!doc.exists) {
+        return null;
+      }
+
+      final data = doc.data()!;
+      return {
+        'rating': data['rating'],
+        'comment': data['comment'],
+        'createdAt': data['createdAt'],
+      };
+    } catch (e) {
+      debugPrint("❌ Error getting user rating: $e");
+      return null;
     }
   }
 
@@ -576,15 +693,30 @@ class FirebaseDatabaseService {
     try {
       debugPrint("Getting chats for user: $userId");
 
-      final querySnapshot = await _firestore
-          .collection('chats')
-          .where('participants', arrayContains: userId)
-          .orderBy('lastMessageAt', descending: true)
-          .get();
+      QuerySnapshot querySnapshot;
+      
+      try {
+        // Try query with orderBy (requires composite index)
+        querySnapshot = await _firestore
+            .collection('chats')
+            .where('participants', arrayContains: userId)
+            .orderBy('lastMessageAt', descending: true)
+            .get();
+        debugPrint("✅ Using indexed query for user chats");
+      } catch (e) {
+        // Fallback: query without orderBy if index doesn't exist
+        debugPrint("⚠️ Index missing for participants+lastMessageAt, using fallback query");
+        debugPrint("   Create index: https://console.firebase.google.com/project/_/firestore/indexes");
+        querySnapshot = await _firestore
+            .collection('chats')
+            .where('participants', arrayContains: userId)
+            .get();
+        debugPrint("⚠️ Using fallback query (no ordering): ${querySnapshot.docs.length} docs");
+      }
 
       final chats = await Future.wait(
         querySnapshot.docs.map((doc) async {
-          final data = doc.data();
+          final data = doc.data() as Map<String, dynamic>;
           
           // Fetch property details
           final propertyId = data['propertyId'];
@@ -601,14 +733,14 @@ class FirebaseDatabaseService {
           }
 
           // Fetch participant details
-          final renterId = data['renterId'];
-          final landlordId = data['landlordId'];
+          final renterId = data['renterId'] as String;
+          final landlordId = data['landlordId'] as String;
 
           final renterDoc = await _firestore.collection('users').doc(renterId).get();
           final landlordDoc = await _firestore.collection('users').doc(landlordId).get();
 
-          final renterData = renterDoc.exists ? renterDoc.data() : null;
-          final landlordData = landlordDoc.exists ? landlordDoc.data() : null;
+          final renterData = renterDoc.exists ? renterDoc.data() as Map<String, dynamic> : null;
+          final landlordData = landlordDoc.exists ? landlordDoc.data() as Map<String, dynamic> : null;
 
           return {
             'id': doc.id,
@@ -632,6 +764,16 @@ class FirebaseDatabaseService {
           };
         }).toList(),
       );
+
+      // Sort manually by lastMessageAt (newest first)
+      chats.sort((a, b) {
+        final aTime = a['lastMessageAt'] as Timestamp?;
+        final bTime = b['lastMessageAt'] as Timestamp?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
 
       debugPrint("✅ Fetched ${chats.length} chats");
       return chats;
@@ -800,5 +942,128 @@ class FirebaseDatabaseService {
       debugPrint("❌ Error getting unread notifications count: $e");
       return 0;
     }
+  }
+
+  // ========== BOOKMARKS OPERATIONS ==========
+
+  /// --- ADD BOOKMARK ---
+  Future<void> addBookmark({
+    required String userId,
+    required String propertyId,
+  }) async {
+    try {
+      final bookmarkRef = _firestore.collection('bookmarks').doc('${userId}_$propertyId');
+      
+      await bookmarkRef.set({
+        'userId': userId,
+        'propertyId': propertyId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint("✅ Bookmark added successfully");
+    } catch (e) {
+      debugPrint("❌ Error adding bookmark: $e");
+      rethrow;
+    }
+  }
+
+  /// --- REMOVE BOOKMARK ---
+  Future<void> removeBookmark({
+    required String userId,
+    required String propertyId,
+  }) async {
+    try {
+      final bookmarkRef = _firestore.collection('bookmarks').doc('${userId}_$propertyId');
+      await bookmarkRef.delete();
+
+      debugPrint("✅ Bookmark removed successfully");
+    } catch (e) {
+      debugPrint("❌ Error removing bookmark: $e");
+      rethrow;
+    }
+  }
+
+  /// --- CHECK IF PROPERTY IS BOOKMARKED ---
+  Future<bool> isPropertyBookmarked({
+    required String userId,
+    required String propertyId,
+  }) async {
+    try {
+      final bookmarkRef = _firestore.collection('bookmarks').doc('${userId}_$propertyId');
+      final doc = await bookmarkRef.get();
+      return doc.exists;
+    } catch (e) {
+      debugPrint("❌ Error checking bookmark: $e");
+      return false;
+    }
+  }
+
+  /// --- GET USER BOOKMARKS ---
+  Future<List<Property>> getUserBookmarks(String userId) async {
+    try {
+      QuerySnapshot bookmarksSnapshot;
+      
+      try {
+        // Try query with orderBy (requires index)
+        bookmarksSnapshot = await _firestore
+            .collection('bookmarks')
+            .where('userId', isEqualTo: userId)
+            .orderBy('createdAt', descending: true)
+            .get();
+        debugPrint("✅ Using indexed query for bookmarks");
+      } catch (e) {
+        // Fallback: query without orderBy
+        debugPrint("⚠️ Index missing for userId+createdAt, using fallback query");
+        bookmarksSnapshot = await _firestore
+            .collection('bookmarks')
+            .where('userId', isEqualTo: userId)
+            .get();
+      }
+
+      final properties = await Future.wait(
+        bookmarksSnapshot.docs.map((doc) async {
+          final data = doc.data() as Map<String, dynamic>;
+          final propertyId = data['propertyId'] as String?;
+          
+          if (propertyId == null) {
+            return null;
+          }
+
+          final propertyDoc = await _firestore
+              .collection('properties')
+              .doc(propertyId)
+              .get();
+
+          if (!propertyDoc.exists) {
+            return null;
+          }
+
+          final property = Property.fromFirestore(propertyDoc);
+          return await _enrichPropertyWithLandlordDetails(property);
+        }).toList(),
+      );
+
+      // Filter out nulls and sort manually
+      final validProperties = properties.whereType<Property>().toList();
+      validProperties.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      debugPrint("✅ Fetched ${validProperties.length} bookmarked properties");
+      return validProperties;
+    } catch (e) {
+      debugPrint("❌ Error getting user bookmarks: $e");
+      return [];
+    }
+  }
+
+  /// --- GET BOOKMARK STREAM (Real-time) ---
+  Stream<bool> isPropertyBookmarkedStream({
+    required String userId,
+    required String propertyId,
+  }) {
+    return _firestore
+        .collection('bookmarks')
+        .doc('${userId}_$propertyId')
+        .snapshots()
+        .map((doc) => doc.exists);
   }
 }

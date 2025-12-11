@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
@@ -24,12 +25,88 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
   late Property _property;
   bool _isMessageLoading = false;
   bool _isFetchingDetails = false;
+  bool _isBookmarked = false;
+  bool _isBookmarkLoading = false;
 
   @override
   void initState() {
     super.initState();
     _property = widget.property;
     _fetchPropertyDetails();
+    _checkBookmarkStatus();
+  }
+
+  Future<void> _checkBookmarkStatus() async {
+    final user = _authService.getCurrentUser();
+    if (user != null && _property.id != null) {
+      final isBookmarked = await _dbService.isPropertyBookmarked(
+        userId: user.uid,
+        propertyId: _property.id!,
+      );
+      if (mounted) {
+        setState(() {
+          _isBookmarked = isBookmarked;
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleBookmark() async {
+    final user = _authService.getCurrentUser();
+    if (user == null || _property.id == null) return;
+
+    setState(() {
+      _isBookmarkLoading = true;
+    });
+
+    try {
+      if (_isBookmarked) {
+        await _dbService.removeBookmark(
+          userId: user.uid,
+          propertyId: _property.id!,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Removed from bookmarks'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+      } else {
+        await _dbService.addBookmark(
+          userId: user.uid,
+          propertyId: _property.id!,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Added to bookmarks'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _isBookmarked = !_isBookmarked;
+          _isBookmarkLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isBookmarkLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _handleBookNow() {
@@ -140,6 +217,27 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
         title: Text(property.name),
         backgroundColor: lightGreen,
         foregroundColor: Colors.white,
+        actions: [
+          _isBookmarkLoading
+              ? const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                )
+              : IconButton(
+                  icon: Icon(
+                    _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                  ),
+                  onPressed: _toggleBookmark,
+                  tooltip: _isBookmarked ? 'Remove bookmark' : 'Add bookmark',
+                ),
+        ],
       ),
       // --- Sticky Bottom Button ---
       // We use bottomNavigationBar to make the button
@@ -340,6 +438,29 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                     style: const TextStyle(fontSize: 16, height: 1.5),
                   ),
                   const SizedBox(height: 24),
+
+                  // --- Ratings & Reviews ---
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Ratings & Reviews',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      TextButton.icon(
+                        onPressed: _showAddRatingDialog,
+                        icon: const Icon(Icons.rate_review, size: 18),
+                        label: const Text('Add Review'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: primaryGreen,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(thickness: 0.5, height: 20),
+                  _buildRatingsSection(),
+                  const SizedBox(height: 24),
+
                   const Text(
                     'Landlord Information',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -426,5 +547,262 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
       return 'N/A';
     }
     return parts.join(' ');
+  }
+
+  Widget _buildRatingsSection() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _dbService.getPropertyRatings(_property.id!),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: CircularProgressIndicator(color: primaryGreen),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Text('Error loading reviews: ${snapshot.error}');
+        }
+
+        final ratings = snapshot.data ?? [];
+
+        if (ratings.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16.0),
+            child: Center(
+              child: Text(
+                'No reviews yet. Be the first to review!',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: ratings.map((rating) {
+            final userName = rating['userName'] ?? 'Anonymous';
+            final ratingValue = rating['rating'] as int;
+            final comment = rating['comment'] as String?;
+            final createdAt = rating['createdAt'] as Timestamp?;
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: lightGreen.withAlpha(51),
+                          child: Text(
+                            userName[0].toUpperCase(),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: darkGreen,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                userName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Row(
+                                children: List.generate(5, (index) {
+                                  return Icon(
+                                    index < ratingValue
+                                        ? Icons.star
+                                        : Icons.star_border,
+                                    color: Colors.amber,
+                                    size: 16,
+                                  );
+                                }),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (createdAt != null)
+                          Text(
+                            _formatDate(createdAt.toDate()),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (comment != null && comment.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        comment,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
+  }
+
+  void _showAddRatingDialog() async {
+    final user = _authService.getCurrentUser();
+    if (user == null || _property.id == null) return;
+
+    // Check if user already has a rating
+    final existingRating = await _dbService.getUserRatingForProperty(
+      propertyId: _property.id!,
+      userId: user.uid,
+    );
+
+    int selectedRating = existingRating?['rating'] ?? 0;
+    final commentController = TextEditingController(
+      text: existingRating?['comment'] ?? '',
+    );
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text(existingRating != null ? 'Update Review' : 'Add Review'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Rating (Optional)',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return IconButton(
+                      icon: Icon(
+                        index < selectedRating ? Icons.star : Icons.star_border,
+                        color: Colors.amber,
+                        size: 36,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          selectedRating = index + 1;
+                        });
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Comment (Optional)',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: commentController,
+                  maxLines: 4,
+                  maxLength: 500,
+                  decoration: InputDecoration(
+                    hintText: 'Share your experience...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: primaryGreen, width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                      // Capture context before async gap
+                      final navigator = Navigator.of(context);
+                      final messenger = ScaffoldMessenger.of(context);
+                      
+                      try {
+                        await _dbService.addPropertyRating(
+                          propertyId: _property.id!,
+                          userId: user.uid,
+                          rating: selectedRating,
+                          comment: commentController.text.trim().isEmpty
+                              ? null
+                              : commentController.text.trim(),
+                        );
+
+                        if (mounted) {
+                          navigator.pop();
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Review submitted successfully!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          // Refresh the screen to show updated ratings
+                          setState(() {
+                            _fetchPropertyDetails();
+                          });
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          navigator.pop();
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryGreen,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

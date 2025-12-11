@@ -2,6 +2,26 @@
 
 ## [2025-12-11 - Latest Updates]
 
+### Ratings & Reviews System - Optional Fields
+- **Implemented comprehensive ratings and reviews feature** for renters:
+  - ✅ Added `addPropertyRating()`, `getPropertyRatings()`, `getUserRatingForProperty()` methods in FirebaseDatabaseService
+  - ✅ Both rating (1-5 stars) and comment are **optional** - at least one must be provided
+  - ✅ Automatic average rating calculation (filters out comment-only reviews)
+  - ✅ Real-time rating count and average displayed on property cards
+  - ✅ Reviews stored in subcollection: `properties/{propertyId}/ratings`
+  - ✅ Rating dialog with interactive star selector and comment field
+  - ✅ Reviews display with user avatar, stars, comment, and formatted date
+  - ✅ Date formatting: "Today", "Yesterday", or "MMM dd, yyyy"
+  - ✅ Fixed `_recalculatePropertyRating()` to handle null ratings gracefully
+  - ✅ Validation ensures at least one field (rating or comment) is provided
+
+- **Property Details Screen Updates**:
+  - Added "Ratings & Reviews" section with "Add Review" button
+  - Shows all reviews with star ratings, comments, and timestamps
+  - Interactive star selector (tap to rate 1-5 stars)
+  - Optional comment field for detailed feedback
+  - Fixed BuildContext async gap warnings
+
 ### Property Model Enhancement - Showers Field
 - **Added showers/bathrooms field** to Property model and all related screens:
   - ✅ `lib/models/property.dart`: Added `showers` field with full serialization (toJson, toFirestore, fromFirestore, fromMap, copyWith)

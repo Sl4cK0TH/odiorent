@@ -12,6 +12,7 @@ import 'package:odiorent/screens/admin/admin_change_password_screen.dart';
 import 'package:odiorent/models/admin_user.dart';
 import 'package:odiorent/screens/shared/notifications_screen.dart';
 import 'package:odiorent/screens/renter/messages_screen.dart';
+import 'package:odiorent/screens/renter/bookmarks_screen.dart';
 
 class RenterHomeScreen extends StatefulWidget {
   const RenterHomeScreen({super.key});
@@ -134,6 +135,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
           index: _selectedIndex,
           children: [
             _buildHomeTab(),
+            const BookmarksScreen(),
             const MessagesScreen(),
             const NotificationsScreen(),
             _buildAccountTab(),
@@ -453,19 +455,24 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
               index: 0,
             ),
             _buildNavItem(
+              icon: Icons.bookmark_border,
+              activeIcon: Icons.bookmark,
+              index: 1,
+            ),
+            _buildNavItem(
               icon: Icons.message_outlined,
               activeIcon: Icons.message,
-              index: 1,
+              index: 2,
             ),
             _buildNavItem(
               icon: Icons.notifications_outlined,
               activeIcon: Icons.notifications,
-              index: 2,
+              index: 3,
             ),
             _buildNavItem(
               icon: Icons.person_outline,
               activeIcon: Icons.person,
-              index: 3,
+              index: 4,
             ),
           ],
         ),
