@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:odiorent/models/chat.dart';
-import 'package:odiorent/services/auth_service.dart';
-import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:odiorent/screens/shared/chat_room_screen.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -16,8 +16,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
   static const Color primaryGreen = Color(0xFF4CAF50);
   static const Color lightGreen = Color(0xFF66BB6A);
 
-  final _dbService = DatabaseService();
-  final _authService = AuthService();
+  final _dbService = FirebaseDatabaseService();
+  final _authService = FirebaseAuthService();
   List<Chat> _chats = [];
   bool _isLoading = true;
 

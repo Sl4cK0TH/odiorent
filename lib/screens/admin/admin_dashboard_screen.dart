@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:odiorent/models/property.dart';
-import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:odiorent/widgets/admin-widgets/statistic_card.dart';
 import 'package:odiorent/screens/admin/admin_property_list_screen.dart';
 import 'package:odiorent/screens/admin/admin_account_screen.dart';
@@ -18,7 +18,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   static const Color primaryGreen = Color(0xFF4CAF50);
   static const Color lightGreen = Color(0xFF66BB6A);
 
-  final DatabaseService _dbService = DatabaseService();
+  final FirebaseDatabaseService _dbService = FirebaseDatabaseService();
   DateTime? lastPressed;
 
   int _selectedIndex = 0;

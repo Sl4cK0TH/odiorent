@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:odiorent/models/admin_user.dart'; // Import the AdminUser model
-import 'package:odiorent/services/auth_service.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/screens/shared/welcome_screen.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:odiorent/screens/admin/admin_edit_profile_screen.dart'; // New import
@@ -14,7 +14,7 @@ class AdminAccountScreen extends StatefulWidget {
 }
 
 class _AdminAccountScreenState extends State<AdminAccountScreen> {
-  final AuthService _authService = AuthService();
+  final FirebaseAuthService _authService = FirebaseAuthService();
   late Future<AdminUser?> _userProfileFuture; // Changed to AdminUser
 
   @override

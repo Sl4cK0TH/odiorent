@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/models/chat.dart';
-import 'package:odiorent/services/auth_service.dart';
-import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:odiorent/screens/landlord/add_property_screen.dart';
 import 'package:odiorent/screens/shared/welcome_screen.dart';
 import 'package:odiorent/screens/shared/chat_room_screen.dart';
@@ -28,8 +28,8 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   static const Color lightGreen = Color(0xFF66BB6A);
 
   int _selectedIndex = 0;
-  final DatabaseService _dbService = DatabaseService();
-  final AuthService _authService = AuthService();
+  final FirebaseDatabaseService _dbService = FirebaseDatabaseService();
+  final FirebaseAuthService _authService = FirebaseAuthService();
 
   Future<List<Property>> _propertiesFuture = Future.value(<Property>[]);
   final TextEditingController _searchController = TextEditingController();

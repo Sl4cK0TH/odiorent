@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:odiorent/models/admin_user.dart';
 // Removed: import 'package:odiorent/services/auth_service.dart';
-import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
 
 class AdminEditProfileScreen extends StatefulWidget {
   final AdminUser adminUser;
@@ -16,7 +16,7 @@ class AdminEditProfileScreen extends StatefulWidget {
 class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   // Removed: final AuthService _authService = AuthService();
-  final DatabaseService _databaseService = DatabaseService();
+  final FirebaseDatabaseService _databaseService = FirebaseDatabaseService();
 
   late TextEditingController _firstNameController;
   late TextEditingController _middleNameController;

@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:odiorent/models/admin_user.dart';
-import 'package:odiorent/services/auth_service.dart';
-import 'package:odiorent/services/database_service.dart';
-import 'package:odiorent/services/storage_service.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
+import 'package:odiorent/services/cloudinary_service.dart';
 import 'package:path/path.dart' as p; // Import path package with prefix
 
 class RenterEditProfileScreen extends StatefulWidget {
@@ -21,9 +21,9 @@ class RenterEditProfileScreen extends StatefulWidget {
 
 class _RenterEditProfileScreenState extends State<RenterEditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  final AuthService _authService = AuthService();
-  final DatabaseService _dbService = DatabaseService();
-  final StorageService _storageService = StorageService();
+  final FirebaseAuthService _authService = FirebaseAuthService();
+  final FirebaseDatabaseService _dbService = FirebaseDatabaseService();
+  final CloudinaryService _storageService = CloudinaryService();
 
   late TextEditingController _firstNameController;
   late TextEditingController _middleNameController;

@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:odiorent/models/message.dart';
-import 'package:odiorent/services/auth_service.dart';
-import 'package:odiorent/services/database_service.dart' hide supabase;
+import 'package:odiorent/services/firebase_auth_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -35,8 +35,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   static const Color primaryGreen = Color(0xFF4CAF50);
   static const Color lightGreen = Color(0xFF66BB6A);
 
-  final _dbService = DatabaseService();
-  final _authService = AuthService();
+  final _dbService = FirebaseDatabaseService();
+  final _authService = FirebaseAuthService();
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   final _picker = ImagePicker();

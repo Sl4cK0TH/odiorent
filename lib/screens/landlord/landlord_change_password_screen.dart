@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:odiorent/services/auth_service.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
 
 class LandlordChangePasswordScreen extends StatefulWidget {
   const LandlordChangePasswordScreen({super.key});
@@ -11,7 +11,7 @@ class LandlordChangePasswordScreen extends StatefulWidget {
 
 class _LandlordChangePasswordScreenState extends State<LandlordChangePasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final AuthService _authService = AuthService();
+  final FirebaseAuthService _authService = FirebaseAuthService();
 
   final TextEditingController _currentPasswordController = TextEditingController();
   final TextEditingController _newPasswordController = TextEditingController();
