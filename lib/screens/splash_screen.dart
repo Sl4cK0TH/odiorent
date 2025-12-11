@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 // 1. --- Import all the screens we need to navigate to ---
 import 'package:odiorent/screens/shared/welcome_screen.dart';
-import 'package:odiorent/services/auth_service.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/services/push_notification_service.dart';
 import 'package:odiorent/screens/renter/renter_home_screen.dart';
 import 'package:odiorent/screens/landlord/landlord_home_screen.dart';
@@ -25,8 +25,8 @@ class _SplashScreenState extends State<SplashScreen>
   static const Color lightGreen = Color(0xFF66BB6A); // Light green for gradient
   static const Color darkGreen = Color(0xFF388E3C); // Dark green for gradient
 
-  // 2. --- Add the AuthService ---
-  final AuthService _authService = AuthService();
+  // 2. --- Add the FirebaseAuthService ---
+  final FirebaseAuthService _authService = FirebaseAuthService();
 
   @override
   void initState() {
