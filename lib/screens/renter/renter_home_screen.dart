@@ -139,7 +139,6 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
             const BookmarksScreen(),
             const MyBookingsScreen(),
             const MessagesScreen(),
-            const NotificationsScreen(),
             _buildAccountTab(),
           ],
         ),
@@ -169,6 +168,18 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
                 fontSize: 24,
               ),
             ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
 
           // Search Box
@@ -449,7 +460,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
     child: BottomAppBar(
         height: 54,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildNavItem(
               icon: Icons.home_outlined,
@@ -472,14 +483,9 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
               index: 3,
             ),
             _buildNavItem(
-              icon: Icons.notifications_outlined,
-              activeIcon: Icons.notifications,
-              index: 4,
-            ),
-            _buildNavItem(
               icon: Icons.person_outline,
               activeIcon: Icons.person,
-              index: 5,
+              index: 4,
             ),
           ],
         ),
