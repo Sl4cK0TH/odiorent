@@ -11,6 +11,7 @@ import 'package:odiorent/screens/shared/chat_room_screen.dart';
 import 'package:odiorent/widgets/property_card.dart';
 import 'package:odiorent/screens/landlord/landlord_edit_profile_screen.dart';
 import 'package:odiorent/screens/landlord/landlord_change_password_screen.dart';
+import 'package:odiorent/screens/landlord/landlord_bookings_screen.dart';
 import 'package:odiorent/screens/shared/notifications_screen.dart';
 import 'package:odiorent/models/admin_user.dart'; // New import for AdminUser
 import 'package:odiorent/screens/landlord/landlord_property_details_screen.dart';
@@ -178,9 +179,10 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
           index: _selectedIndex,
           children: [
             _buildHomeTab(), // 0
-            _buildMessagesTab(), // 1
-            _buildNotificationsTab(), // 2
-            _buildAccountTab(), // 3
+            const LandlordBookingsScreen(), // 1
+            _buildMessagesTab(), // 2
+            _buildNotificationsTab(), // 3
+            _buildAccountTab(), // 4
           ],
         ),
         bottomNavigationBar: Padding(
@@ -519,13 +521,14 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildNavItem(icon: Icons.home_outlined, activeIcon: Icons.home, index: 0),
-            _buildNavItem(icon: Icons.message_outlined, activeIcon: Icons.message, index: 1),
+            _buildNavItem(icon: Icons.calendar_month_outlined, activeIcon: Icons.calendar_month, index: 1),
+            _buildNavItem(icon: Icons.message_outlined, activeIcon: Icons.message, index: 2),
             const SizedBox(width: 40), // The gap for the FAB
             _buildNavItem(
                 icon: Icons.notifications_outlined,
                 activeIcon: Icons.notifications,
-                index: 2),
-            _buildNavItem(icon: Icons.person_outline, activeIcon: Icons.person, index: 3),
+                index: 3),
+            _buildNavItem(icon: Icons.person_outline, activeIcon: Icons.person, index: 4),
           ],
         ),
       ),

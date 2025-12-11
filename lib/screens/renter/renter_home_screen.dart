@@ -13,6 +13,7 @@ import 'package:odiorent/models/admin_user.dart';
 import 'package:odiorent/screens/shared/notifications_screen.dart';
 import 'package:odiorent/screens/renter/messages_screen.dart';
 import 'package:odiorent/screens/renter/bookmarks_screen.dart';
+import 'package:odiorent/screens/renter/my_bookings_screen.dart';
 
 class RenterHomeScreen extends StatefulWidget {
   const RenterHomeScreen({super.key});
@@ -136,6 +137,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
           children: [
             _buildHomeTab(),
             const BookmarksScreen(),
+            const MyBookingsScreen(),
             const MessagesScreen(),
             const NotificationsScreen(),
             _buildAccountTab(),
@@ -460,19 +462,24 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
               index: 1,
             ),
             _buildNavItem(
+              icon: Icons.calendar_month_outlined,
+              activeIcon: Icons.calendar_month,
+              index: 2,
+            ),
+            _buildNavItem(
               icon: Icons.message_outlined,
               activeIcon: Icons.message,
-              index: 2,
+              index: 3,
             ),
             _buildNavItem(
               icon: Icons.notifications_outlined,
               activeIcon: Icons.notifications,
-              index: 3,
+              index: 4,
             ),
             _buildNavItem(
               icon: Icons.person_outline,
               activeIcon: Icons.person,
-              index: 4,
+              index: 5,
             ),
           ],
         ),
