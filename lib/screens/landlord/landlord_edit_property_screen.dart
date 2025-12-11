@@ -4,6 +4,10 @@ import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:odiorent/models/admin_user.dart';
 import 'package:odiorent/services/firebase_auth_service.dart';
+import 'package:odiorent/services/cloudinary_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:path/path.dart' as p;
 
 class LandlordEditPropertyScreen extends StatefulWidget {
   final Property property;
@@ -20,6 +24,8 @@ class _LandlordEditPropertyScreenState
   final _formKey = GlobalKey<FormState>();
   final FirebaseDatabaseService _dbService = FirebaseDatabaseService();
   final FirebaseAuthService _authService = FirebaseAuthService();
+  final CloudinaryService _storageService = CloudinaryService();
+  final ImagePicker _picker = ImagePicker();
 
   late TextEditingController _nameController;
   late TextEditingController _addressController;
@@ -30,6 +36,11 @@ class _LandlordEditPropertyScreenState
 
   bool _isLoading = false;
   AdminUser? _landlordProfile;
+  
+  // Image management
+  List<String> _currentImageUrls = [];
+  List<XFile> _newImageFiles = [];
+  Set<int> _imagesToDelete = {}; // Track indices of images to delete
 
   @override
   void initState() {
@@ -44,6 +55,9 @@ class _LandlordEditPropertyScreenState
         TextEditingController(text: widget.property.rooms.toString());
     _bedsController =
         TextEditingController(text: widget.property.beds.toString());
+    
+    // Initialize with current images
+    _currentImageUrls = List.from(widget.property.imageUrls);
 
     _fetchLandlordProfile();
   }
@@ -73,11 +87,58 @@ class _LandlordEditPropertyScreenState
       return;
     }
 
+    // Validate images
+    final remainingImages = _currentImageUrls.length - _imagesToDelete.length;
+    final totalImages = remainingImages + _newImageFiles.length;
+    
+    if (totalImages == 0) {
+      Fluttertoast.showToast(
+        msg: "Please add at least one image",
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
+      final userId = _authService.getCurrentUser()?.uid;
+      if (userId == null) throw Exception("User not logged in");
+
+      // 1. Upload new images to Cloudinary
+      List<String> newUploadedUrls = [];
+      if (_newImageFiles.isNotEmpty) {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final uploadTasks = _newImageFiles.asMap().entries.map((entry) async {
+          final imageFile = entry.value;
+          final bytes = await imageFile.readAsBytes();
+          final extension = p.extension(imageFile.path).isEmpty
+              ? '.jpg'
+              : p.extension(imageFile.path);
+          final fileName = 'property_${userId}_${timestamp}_edit_${entry.key}$extension';
+
+          return _storageService.uploadFile(
+            folder: 'properties',
+            bytes: bytes,
+            fileName: fileName,
+            userId: userId,
+          );
+        }).toList();
+        newUploadedUrls = await Future.wait(uploadTasks);
+      }
+
+      // 2. Build final image URLs list (remove deleted, add new)
+      List<String> finalImageUrls = [];
+      for (int i = 0; i < _currentImageUrls.length; i++) {
+        if (!_imagesToDelete.contains(i)) {
+          finalImageUrls.add(_currentImageUrls[i]);
+        }
+      }
+      finalImageUrls.addAll(newUploadedUrls);
+
+      // 3. Update property
       final updatedProperty = Property(
         id: widget.property.id,
         landlordId: widget.property.landlordId,
@@ -87,7 +148,7 @@ class _LandlordEditPropertyScreenState
         price: double.parse(_priceController.text.trim()),
         rooms: int.parse(_roomsController.text.trim()),
         beds: int.parse(_bedsController.text.trim()),
-        imageUrls: widget.property.imageUrls,
+        imageUrls: finalImageUrls,
         status: widget.property.status,
         createdAt: widget.property.createdAt,
         approvedAt: widget.property.approvedAt,
@@ -112,6 +173,60 @@ class _LandlordEditPropertyScreenState
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _pickImages() async {
+    try {
+      final pickedFiles = await _picker.pickMultiImage();
+      if (pickedFiles.isNotEmpty) {
+        setState(() {
+          _newImageFiles.addAll(pickedFiles);
+        });
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: "Error picking images: $e",
+        backgroundColor: Colors.red,
+      );
+    }
+  }
+
+  void _removeNewImage(int index) {
+    setState(() {
+      _newImageFiles.removeAt(index);
+    });
+  }
+
+  void _toggleDeleteCurrentImage(int index) {
+    setState(() {
+      if (_imagesToDelete.contains(index)) {
+        _imagesToDelete.remove(index);
+      } else {
+        _imagesToDelete.add(index);
+      }
+    });
+  }
+
+  Future<void> _replaceImage(int index) async {
+    try {
+      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() {
+          // Mark old image for deletion and add new one
+          _imagesToDelete.add(index);
+          _newImageFiles.add(pickedFile);
+        });
+        Fluttertoast.showToast(
+          msg: "Image will be replaced when you save",
+          backgroundColor: Colors.blue,
+        );
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: "Error picking image: $e",
+        backgroundColor: Colors.red,
+      );
     }
   }
 
@@ -166,9 +281,163 @@ class _LandlordEditPropertyScreenState
                   label: 'Number of Beds',
                   keyboardType: TextInputType.number),
               const SizedBox(height: 24),
-              // TODO: Add image editing functionality here
-              const Text("Image editing is not yet available.", style: TextStyle(color: Colors.grey)),
+              
+              // --- Image Management Section ---
+              const Text(
+                'Property Images',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              
+              // Current Images
+              if (_currentImageUrls.isNotEmpty) ...[
+                const Text(
+                  'Current Images (tap to replace, long-press to delete)',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 120,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _currentImageUrls.length,
+                    itemBuilder: (context, index) {
+                      final isMarkedForDeletion = _imagesToDelete.contains(index);
+                      return GestureDetector(
+                        onTap: () => _replaceImage(index),
+                        onLongPress: () => _toggleDeleteCurrentImage(index),
+                        child: Container(
+                          width: 120,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: isMarkedForDeletion ? Colors.red : Colors.grey,
+                              width: isMarkedForDeletion ? 3 : 1,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  _currentImageUrls[index],
+                                  width: 120,
+                                  height: 120,
+                                  fit: BoxFit.cover,
+                                  colorBlendMode: isMarkedForDeletion 
+                                      ? BlendMode.saturation 
+                                      : BlendMode.dst,
+                                  color: isMarkedForDeletion 
+                                      ? Colors.grey 
+                                      : null,
+                                ),
+                              ),
+                              if (isMarkedForDeletion)
+                                Container(
+                                  width: 120,
+                                  height: 120,
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withOpacity(0.5),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.delete_forever,
+                                      color: Colors.white,
+                                      size: 40,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              
+              // New Images to Upload
+              if (_newImageFiles.isNotEmpty) ...[
+                const Text(
+                  'New Images to Upload',
+                  style: TextStyle(fontSize: 12, color: Colors.green),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 120,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _newImageFiles.length,
+                    itemBuilder: (context, index) {
+                      return Stack(
+                        children: [
+                          Container(
+                            width: 120,
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.green, width: 2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(
+                                File(_newImageFiles[index].path),
+                                width: 120,
+                                height: 120,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 12,
+                            child: GestureDetector(
+                              onTap: () => _removeNewImage(index),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                padding: const EdgeInsets.all(4),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              
+              // Add Images Button
+              OutlinedButton.icon(
+                onPressed: _isLoading ? null : _pickImages,
+                icon: const Icon(Icons.add_photo_alternate),
+                label: const Text('Add More Images'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF4CAF50),
+                  side: const BorderSide(color: Color(0xFF4CAF50)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+              Text(
+                'Total: ${(_currentImageUrls.length - _imagesToDelete.length) + _newImageFiles.length} images',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              
               const SizedBox(height: 24),
+              
               ElevatedButton(
                 onPressed: _isLoading ? null : _handleUpdateProperty,
                 style: ElevatedButton.styleFrom(
