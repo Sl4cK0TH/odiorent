@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:odiorent/screens/shared/welcome_screen.dart';
 import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/services/push_notification_service.dart';
+import 'package:odiorent/services/permission_service.dart';
 import 'package:odiorent/screens/renter/renter_home_screen.dart';
 import 'package:odiorent/screens/landlord/landlord_home_screen.dart';
 import 'package:odiorent/screens/admin/admin_dashboard_screen.dart';
@@ -57,12 +58,12 @@ class _SplashScreenState extends State<SplashScreen>
   /// 4. --- This is the new "Auth-Aware" logic ---
   Future<void> _redirectUser() async {
     // We wait for at least 2 seconds (2000ms) to let the animation play
-    // and to ensure Supabase has initialized.
+    // and to ensure Firebase has initialized.
     await Future.delayed(const Duration(milliseconds: 2000));
 
     if (!mounted) return; // Check if the widget is still on screen
 
-    // Get the current user from Supabase
+    // Get the current user from Firebase
     final currentUser = _authService.getCurrentUser();
 
     if (currentUser == null) {
@@ -70,7 +71,13 @@ class _SplashScreenState extends State<SplashScreen>
       _navigateTo(const WelcomeScreen());
     } else {
       // --- Case 2: A user is logged in ---
-      // Initialize Push Notification Service
+      // Request all required permissions before initializing notifications
+      // This is important for Android 13+ and iOS
+      if (mounted) {
+        await PermissionService.requestAllPermissions(context);
+      }
+      
+      // Initialize Push Notification Service after permissions are granted
       // We do this here because we need the user's ID.
       // This is a "fire-and-forget" call.
       PushNotificationService().init(currentUser.uid);

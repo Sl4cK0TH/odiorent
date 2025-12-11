@@ -2,6 +2,62 @@
 
 ## [2025-12-12 - Latest Updates]
 
+### Push Notifications & Permissions System - COMPLETE ✅
+- **Comprehensive push notification implementation with runtime permissions**:
+  - ✅ Added `flutter_local_notifications: ^18.0.1` for local notifications
+  - ✅ Added `permission_handler: ^11.3.1` for runtime permission requests
+  - ✅ Android POST_NOTIFICATIONS permission for Android 13+ (Tiramisu)
+  - ✅ Android VIBRATE and RECEIVE_BOOT_COMPLETED permissions
+  - ✅ iOS permission descriptions in Info.plist (Camera, Photo Library, Photo Library Add)
+
+- **PermissionService** (lib/services/permission_service.dart):
+  - ✅ `requestAllPermissions()` - Request Camera, Storage/Photos, and Notifications on app launch
+  - ✅ Individual permission methods: `requestCameraPermission()`, `requestStoragePermission()`, `requestNotificationPermission()`
+  - ✅ Permission status checking: `isCameraGranted()`, `isStorageGranted()`, `isNotificationGranted()`
+  - ✅ Permission explanation dialogs with human-readable descriptions
+  - ✅ Settings redirect for permanently denied permissions
+  - ✅ `requestPermissionWithExplanation()` for contextual permission requests
+
+- **Enhanced PushNotificationService** (lib/services/push_notification_service.dart):
+  - ✅ Local notifications with flutter_local_notifications integration
+  - ✅ Three notification channels: Booking, Message, and General
+  - ✅ Channel-specific importance levels and settings
+  - ✅ `showLocalNotification()` - Display notifications in foreground
+  - ✅ Notification tap handling with payload routing
+  - ✅ Background message handler for FCM
+  - ✅ Foreground message handling with local notification display
+  - ✅ Token management and database sync
+  - ✅ `sendBookingNotification()` - Notify users of booking status changes
+  - ✅ `sendMessageNotification()` - Notify users of new chat messages
+  - ✅ `sendGeneralNotification()` - Send general app notifications
+
+- **Booking Notifications** (integrated in FirebaseDatabaseService):
+  - ✅ New booking request → Notify landlord
+  - ✅ Booking approved → Notify renter with property name
+  - ✅ Booking rejected → Notify renter with reason
+  - ✅ Booking cancelled → Notify renter with reason
+  - ✅ Booking active → Notify renter on move-in date
+  - ✅ Booking completed → Notify renter on move-out date
+
+- **Message Notifications** (integrated in FirebaseDatabaseService):
+  - ✅ New message sent → Notify recipient
+  - ✅ Message preview in notification (truncated to 100 chars)
+  - ✅ Sender name display
+  - ✅ Chat ID in payload for navigation
+
+- **Permission Integration**:
+  - ✅ Request all permissions on splash screen after user login
+  - ✅ Permission dialogs shown before app navigation
+  - ✅ Initialize PushNotificationService after permissions granted
+  - ✅ Context-aware permission requests (check if mounted)
+
+- **Platform-Specific Features**:
+  - ✅ Android 13+ notification permission handling
+  - ✅ iOS permission descriptions for App Store compliance
+  - ✅ Vibration and sound for high-priority notifications
+  - ✅ Notification icons for Android
+  - ✅ Badge support for iOS
+
 ### UI/UX Improvements
 - **Renter Navigation**:
   - ✅ Moved notifications to appbar top-right (matching landlord layout)

@@ -7,6 +7,12 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- Notification permission for Android 13+ (API level 33+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- For vibration on notifications -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- For scheduled notifications -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     
     <application
         android:label="OdioRent"

@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:odiorent/models/message.dart';
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/cloudinary_service.dart';
+import 'package:odiorent/services/push_notification_service.dart';
 import 'package:path/path.dart' as p;
 
 /// Firebase Database Service
@@ -865,6 +866,45 @@ class FirebaseDatabaseService {
       });
 
       debugPrint("✅ Message sent successfully");
+      
+      // Get chat details to determine recipient and sender name
+      final chatDoc = await _firestore.collection('chats').doc(chatId).get();
+      if (chatDoc.exists) {
+        final chatData = chatDoc.data()!;
+        final participants = chatData['participants'] as List<dynamic>;
+        
+        // Find recipient (the user who is not the sender)
+        String? recipientId;
+        for (var participantId in participants) {
+          if (participantId != senderId) {
+            recipientId = participantId as String;
+            break;
+          }
+        }
+        
+        if (recipientId != null) {
+          // Get sender's name
+          final senderDoc = await _firestore.collection('users').doc(senderId).get();
+          String senderName = 'Someone';
+          if (senderDoc.exists) {
+            final senderData = senderDoc.data();
+            if (senderData != null && senderData.containsKey('name')) {
+              senderName = senderData['name'] as String;
+            }
+          }
+          
+          // Send notification to recipient
+          final messagePreview = text ?? lastMessageText;
+          await PushNotificationService().sendMessageNotification(
+            userId: recipientId,
+            senderName: senderName,
+            messagePreview: messagePreview.length > 100 
+                ? '${messagePreview.substring(0, 100)}...' 
+                : messagePreview,
+            chatId: chatId,
+          );
+        }
+      }
     } catch (e) {
       debugPrint("❌ Error sending message: $e");
       rethrow;
@@ -1266,6 +1306,16 @@ class FirebaseDatabaseService {
       final docRef = await _firestore.collection('bookings').add(bookingData);
 
       debugPrint("✅ Booking created successfully with ID: ${docRef.id}");
+      
+      // Send notification to landlord about new booking request
+      await PushNotificationService().sendBookingNotification(
+        userId: landlordId,
+        title: 'New Booking Request 📋',
+        body: '${renterName ?? "A renter"} has requested to book ${propertyName ?? "your property"}.',
+        bookingId: docRef.id,
+        status: 'pending',
+      );
+      
       return docRef.id;
     } catch (e) {
       debugPrint("❌ Error creating booking: $e");
@@ -1441,6 +1491,26 @@ class FirebaseDatabaseService {
     String? cancellationReason,
   }) async {
     try {
+      // Get booking details first for notification
+      final bookingDoc = await _firestore.collection('bookings').doc(bookingId).get();
+      if (!bookingDoc.exists) {
+        throw Exception('Booking not found');
+      }
+      
+      final bookingData = bookingDoc.data()!;
+      final renterId = bookingData['renterId'] as String;
+      final propertyId = bookingData['propertyId'] as String;
+      
+      // Get property details for notification
+      final propertyDoc = await _firestore.collection('properties').doc(propertyId).get();
+      String propertyName = 'Property';
+      if (propertyDoc.exists) {
+        final propertyData = propertyDoc.data();
+        if (propertyData != null && propertyData.containsKey('name')) {
+          propertyName = propertyData['name'] as String;
+        }
+      }
+      
       final updateData = <String, dynamic>{
         'status': status,
       };
@@ -1462,6 +1532,49 @@ class FirebaseDatabaseService {
       await _firestore.collection('bookings').doc(bookingId).update(updateData);
 
       debugPrint("✅ Booking $bookingId status updated to $status");
+      
+      // Send notification to renter about booking status change
+      String notificationTitle = '';
+      String notificationBody = '';
+      
+      switch (status) {
+        case 'approved':
+          notificationTitle = 'Booking Approved! 🎉';
+          notificationBody = 'Your booking for $propertyName has been approved by the landlord.';
+          break;
+        case 'rejected':
+          notificationTitle = 'Booking Rejected';
+          notificationBody = 'Unfortunately, your booking for $propertyName was rejected.';
+          if (rejectionReason != null && rejectionReason.isNotEmpty) {
+            notificationBody += ' Reason: $rejectionReason';
+          }
+          break;
+        case 'cancelled':
+          notificationTitle = 'Booking Cancelled';
+          notificationBody = 'Your booking for $propertyName has been cancelled.';
+          if (cancellationReason != null && cancellationReason.isNotEmpty) {
+            notificationBody += ' Reason: $cancellationReason';
+          }
+          break;
+        case 'active':
+          notificationTitle = 'Booking Active';
+          notificationBody = 'Your booking for $propertyName is now active. Welcome to your new home!';
+          break;
+        case 'completed':
+          notificationTitle = 'Booking Completed';
+          notificationBody = 'Your booking for $propertyName has been completed. Thank you for using OdioRent!';
+          break;
+      }
+      
+      if (notificationTitle.isNotEmpty) {
+        await PushNotificationService().sendBookingNotification(
+          userId: renterId,
+          title: notificationTitle,
+          body: notificationBody,
+          bookingId: bookingId,
+          status: status,
+        );
+      }
     } catch (e) {
       debugPrint("❌ Error updating booking status: $e");
       rethrow;
