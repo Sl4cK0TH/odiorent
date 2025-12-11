@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:odiorent/models/property.dart';
-import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:intl/intl.dart'; // For date formatting
 
 class ApprovedPropertiesList extends StatefulWidget {
@@ -11,7 +11,7 @@ class ApprovedPropertiesList extends StatefulWidget {
 }
 
 class _ApprovedPropertiesListState extends State<ApprovedPropertiesList> {
-  final DatabaseService _dbService = DatabaseService();
+  final FirebaseDatabaseService _dbService = FirebaseDatabaseService();
   late Future<List<Property>> _propertiesFuture;
 
   @override

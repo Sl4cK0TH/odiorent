@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:odiorent/models/property.dart';
-import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:fluttertoast/fluttertoast.dart';
 
@@ -12,7 +12,7 @@ class PendingPropertiesList extends StatefulWidget {
 }
 
 class _PendingPropertiesListState extends State<PendingPropertiesList> {
-  final DatabaseService _dbService = DatabaseService();
+  final FirebaseDatabaseService _dbService = FirebaseDatabaseService();
   late Future<List<Property>> _propertiesFuture;
 
   @override
