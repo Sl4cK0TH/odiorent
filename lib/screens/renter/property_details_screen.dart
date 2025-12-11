@@ -91,7 +91,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
               propertyName: _property.name,
               otherUserName: _formatFullName(_property),
               otherUserId: landlordId,
-              otherUserProfileUrl: _property.landlordProfilePicture,
+              otherUserProfileUrl: _property.landlordProfilePictureUrl,
               initialMessage: initialMessage,
             ),
           ),

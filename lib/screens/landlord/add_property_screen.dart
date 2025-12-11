@@ -103,7 +103,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         final fileName = 'property_${userId}_${timestamp}_${entry.key}$extension';
 
         return _storageService.uploadFile(
-          bucket: 'properties',
+          folder: 'properties',
           bytes: bytes,
           fileName: fileName,
           userId: userId,

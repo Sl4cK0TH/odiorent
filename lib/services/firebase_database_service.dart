@@ -649,7 +649,8 @@ class FirebaseDatabaseService {
 
       // Handle attachment upload
       if (attachmentFile != null) {
-        final fileBytes = await attachmentFile.readAsBytes();
+        // Note: fileBytes read for future use, currently using CloudinaryService
+        // final fileBytes = await attachmentFile.readAsBytes();
         final fileExt = p.extension(attachmentFile.name);
 
         if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].contains(fileExt.toLowerCase())) {

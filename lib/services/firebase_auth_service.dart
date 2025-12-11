@@ -382,4 +382,146 @@ class FirebaseAuthService {
       rethrow;
     }
   }
+
+  /// --- GET CURRENT USER ---
+  /// Returns the currently authenticated Firebase user
+  User? getCurrentUser() {
+    return _auth.currentUser;
+  }
+
+  /// --- GET EMAIL BY USERNAME ---
+  /// Fetches the email address associated with a username
+  /// Returns null if username not found
+  Future<String?> getEmailByUsername(String username) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('users')
+          .where('userName', isEqualTo: username)
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        return null;
+      }
+
+      final email = querySnapshot.docs.first.data()['email'] as String?;
+      return email;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint("❌ Error getting email by username: $e");
+      }
+      return null;
+    }
+  }
+
+  /// --- GET ADMIN USER PROFILE ---
+  /// Fetches the full profile details of the currently logged-in user as AdminUser
+  Future<AdminUser?> getAdminUserProfile() async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) {
+        return null;
+      }
+
+      final doc = await _firestore.collection('users').doc(user.uid).get();
+      
+      if (!doc.exists) {
+        return null;
+      }
+
+      return AdminUser.fromFirestore(doc);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint("Error getting admin user profile: $e");
+      }
+      return null;
+    }
+  }
+
+  /// --- REAUTHENTICATE USER ---
+  /// Re-authenticates the user with their email and password
+  /// Used to verify current password before sensitive operations
+  Future<void> reauthenticateUser({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('No user is currently signed in');
+      }
+
+      final credential = EmailAuthProvider.credential(
+        email: email,
+        password: password,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      if (kDebugMode) {
+        debugPrint("❌ Firebase Auth Exception during reauthentication: ${e.code} - ${e.message}");
+      }
+
+      String errorMessage;
+      switch (e.code) {
+        case 'wrong-password':
+          errorMessage = 'Password is incorrect.';
+          break;
+        case 'user-mismatch':
+          errorMessage = 'The credential does not match the current user.';
+          break;
+        case 'user-not-found':
+          errorMessage = 'No user found with this email.';
+          break;
+        case 'invalid-credential':
+          errorMessage = 'The credential is invalid or has expired.';
+          break;
+        default:
+          errorMessage = e.message ?? 'An error occurred during reauthentication.';
+      }
+
+      throw Exception(errorMessage);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint("❌ Unknown error during reauthentication: $e");
+      }
+      rethrow;
+    }
+  }
+
+  /// --- UPDATE USER PASSWORD ---
+  /// Updates the password for the currently authenticated user
+  Future<void> updateUserPassword({required String newPassword}) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('No user is currently signed in');
+      }
+
+      await user.updatePassword(newPassword);
+    } on FirebaseAuthException catch (e) {
+      if (kDebugMode) {
+        debugPrint("❌ Firebase Auth Exception during password update: ${e.code} - ${e.message}");
+      }
+
+      String errorMessage;
+      switch (e.code) {
+        case 'weak-password':
+          errorMessage = 'Password is too weak. Please use a stronger password.';
+          break;
+        case 'requires-recent-login':
+          errorMessage = 'Please sign in again before changing your password.';
+          break;
+        default:
+          errorMessage = e.message ?? 'An error occurred while updating password.';
+      }
+
+      throw Exception(errorMessage);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint("❌ Unknown error during password update: $e");
+      }
+      rethrow;
+    }
+  }
 }

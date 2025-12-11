@@ -86,7 +86,7 @@ class _RenterEditProfileScreenState extends State<RenterEditProfileScreen> {
         final userId = _authService.getCurrentUser()!.id;
         final fileName = 'profile_$userId${p.extension(_currentUserProfile?.profilePictureUrl ?? '.png')}'; // Use path.extension
         finalProfilePictureUrl = await _storageService.uploadFile(
-          bucket: 'profile_pictures',
+          folder: 'profile_pictures',
           bytes: _newProfileImageBytes!,
           fileName: fileName,
           userId: userId,
