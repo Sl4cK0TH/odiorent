@@ -178,11 +178,50 @@ class _LandlordEditPropertyScreenState
 
   Future<void> _pickImages() async {
     try {
-      final pickedFiles = await _picker.pickMultiImage();
+      final pickedFiles = await _picker.pickMultiImage(
+        imageQuality: 85, // Compress to reduce issues
+      );
+      
       if (pickedFiles.isNotEmpty) {
-        setState(() {
-          _newImageFiles.addAll(pickedFiles);
-        });
+        // Validate each image
+        List<XFile> validImages = [];
+        for (var file in pickedFiles) {
+          try {
+            // Try to read the file to validate it
+            final bytes = await file.readAsBytes();
+            if (bytes.isEmpty) {
+              debugPrint("⚠️ Skipping empty image: ${file.name}");
+              continue;
+            }
+            
+            // Check file size (max 10MB)
+            if (bytes.length > 10 * 1024 * 1024) {
+              Fluttertoast.showToast(
+                msg: "Image ${file.name} is too large (max 10MB)",
+                backgroundColor: Colors.orange,
+              );
+              continue;
+            }
+            
+            validImages.add(file);
+          } catch (e) {
+            debugPrint("⚠️ Invalid image ${file.name}: $e");
+            Fluttertoast.showToast(
+              msg: "Skipped invalid image: ${file.name}",
+              backgroundColor: Colors.orange,
+            );
+          }
+        }
+        
+        if (validImages.isNotEmpty) {
+          setState(() {
+            _newImageFiles.addAll(validImages);
+          });
+          Fluttertoast.showToast(
+            msg: "Added ${validImages.length} image(s)",
+            backgroundColor: Colors.green,
+          );
+        }
       }
     } catch (e) {
       Fluttertoast.showToast(
@@ -210,17 +249,48 @@ class _LandlordEditPropertyScreenState
 
   Future<void> _replaceImage(int index) async {
     try {
-      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      final pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85, // Compress to reduce issues
+      );
+      
       if (pickedFile != null) {
-        setState(() {
-          // Mark old image for deletion and add new one
-          _imagesToDelete.add(index);
-          _newImageFiles.add(pickedFile);
-        });
-        Fluttertoast.showToast(
-          msg: "Image will be replaced when you save",
-          backgroundColor: Colors.blue,
-        );
+        // Validate the image
+        try {
+          final bytes = await pickedFile.readAsBytes();
+          if (bytes.isEmpty) {
+            Fluttertoast.showToast(
+              msg: "Selected image is empty",
+              backgroundColor: Colors.red,
+            );
+            return;
+          }
+          
+          // Check file size (max 10MB)
+          if (bytes.length > 10 * 1024 * 1024) {
+            Fluttertoast.showToast(
+              msg: "Image is too large (max 10MB)",
+              backgroundColor: Colors.red,
+            );
+            return;
+          }
+          
+          setState(() {
+            // Mark old image for deletion and add new one
+            _imagesToDelete.add(index);
+            _newImageFiles.add(pickedFile);
+          });
+          
+          Fluttertoast.showToast(
+            msg: "Image will be replaced when you save",
+            backgroundColor: Colors.blue,
+          );
+        } catch (e) {
+          Fluttertoast.showToast(
+            msg: "Invalid image file",
+            backgroundColor: Colors.red,
+          );
+        }
       }
     } catch (e) {
       Fluttertoast.showToast(
@@ -388,6 +458,25 @@ class _LandlordEditPropertyScreenState
                                 width: 120,
                                 height: 120,
                                 fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: 120,
+                                    height: 120,
+                                    color: Colors.grey[300],
+                                    child: const Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.error, color: Colors.red),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          'Invalid\nImage',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(fontSize: 10),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                           ),
@@ -397,7 +486,7 @@ class _LandlordEditPropertyScreenState
                             child: GestureDetector(
                               onTap: () => _removeNewImage(index),
                               child: Container(
-                                decoration: BoxDecoration(
+                                decoration: const BoxDecoration(
                                   color: Colors.red,
                                   shape: BoxShape.circle,
                                 ),
