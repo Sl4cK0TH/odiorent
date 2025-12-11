@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 // Enum to represent the type of attachment in a message
 enum MessageAttachmentType {
   image,
@@ -72,5 +74,35 @@ class Message {
       'attachment_url': attachmentUrl,
       'attachment_type': attachmentTypeToString(attachmentType),
     };
+  }
+
+  /// --- `toFirestore` Method ---
+  /// Converts a Message object into a Map for Firestore
+  Map<String, dynamic> toFirestore() {
+    return {
+      'chatId': chatId,
+      'senderId': senderId,
+      'text': text,
+      'sentAt': Timestamp.fromDate(sentAt),
+      'readAt': readAt != null ? Timestamp.fromDate(readAt!) : null,
+      'attachmentUrl': attachmentUrl,
+      'attachmentType': attachmentTypeToString(attachmentType),
+    };
+  }
+
+  /// --- `fromFirestore` Factory ---
+  /// Creates a Message object from a Firestore DocumentSnapshot
+  factory Message.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Message(
+      id: doc.id,
+      chatId: data['chatId'] as String,
+      senderId: data['senderId'] as String,
+      text: data['text'] as String?,
+      sentAt: (data['sentAt'] as Timestamp).toDate(),
+      readAt: (data['readAt'] as Timestamp?)?.toDate(),
+      attachmentUrl: data['attachmentUrl'] as String?,
+      attachmentType: attachmentTypeFromString(data['attachmentType'] as String?),
+    );
   }
 }

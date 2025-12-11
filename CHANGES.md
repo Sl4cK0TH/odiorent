@@ -1,5 +1,43 @@
 # Changelog
 
+## [2025-12-11 - Firebase Migration] - Big Bang Migration Start
+
+### Git Backup
+- **[10:45 AM]** Created `backup-supabase` branch to preserve current Supabase implementation
+- **[10:45 AM]** Created `firebase-migration` branch for migration work
+- **[10:45 AM]** Committed current state before migration begins
+
+### New Services Created
+- **[10:46 AM]** Created `lib/services/firebase_auth_service.dart`
+  - Replaces Supabase Auth with Firebase Auth
+  - Implements: Sign up, sign in, sign out, get role, get user data
+  - Added: Change password, send password reset email, delete account
+  - User profiles stored in Firestore `users` collection
+  - Comprehensive error handling with user-friendly messages
+
+- **[10:50 AM]** Created `lib/services/firebase_database_service.dart`
+  - Replaces Supabase DatabaseService with Cloud Firestore
+  - Implements all CRUD operations for properties
+  - Client-side search filtering (name, address, description, landlord name)
+  - Property ratings with automatic average calculation
+  - Real-time chat messaging with Firestore snapshots
+  - User profile management
+  - Notifications system
+  - FCM token management
+  - Uses Cloudinary for file uploads (images & videos)
+  - Total: 30+ database methods migrated
+
+### Models Updated for Firestore Compatibility
+- **[$(date '+%I:%M %p')]** Updated all models with Firestore methods:
+  - ✅ `lib/models/property.dart`: Added `toFirestore()`, `fromFirestore()`, `copyWith()`
+  - ✅ `lib/models/message.dart`: Added `toFirestore()`, `fromFirestore()` with Timestamp handling
+  - ✅ `lib/models/user.dart`: Added `toFirestore()`, `fromFirestore()` with UserRole conversion
+  - ✅ `lib/models/chat.dart`: Added `toFirestore()`, `fromFirestore()` with Timestamp handling
+  - ✅ `lib/models/admin_user.dart`: Added `toFirestore()`, `fromFirestore()`
+  - All models preserve backward compatibility with existing `fromMap()`/`toMap()` methods
+
+---
+
 ## December 2, 2025
 
 ### New Features

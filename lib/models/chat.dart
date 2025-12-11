@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Chat {
   final String id;
   final String? lastMessage;
@@ -65,5 +67,41 @@ class Chat {
       return otherUserFirstName!;
     }
     return 'Unknown User';
+  }
+
+  /// --- `toFirestore` Method ---
+  /// Converts a Chat object into a Map for Firestore
+  Map<String, dynamic> toFirestore() {
+    return {
+      'lastMessage': lastMessage,
+      'lastMessageAt': lastMessageAt != null ? Timestamp.fromDate(lastMessageAt!) : null,
+      'propertyName': propertyName,
+      'propertyAddress': propertyAddress,
+      'propertyImageUrls': propertyImageUrls,
+      'otherUserId': otherUserId,
+      'otherUserName': otherUserName,
+      'otherUserFirstName': otherUserFirstName,
+      'otherUserLastName': otherUserLastName,
+      'otherUserProfilePicture': otherUserProfilePicture,
+    };
+  }
+
+  /// --- `fromFirestore` Factory ---
+  /// Creates a Chat object from a Firestore DocumentSnapshot
+  factory Chat.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Chat(
+      id: doc.id,
+      lastMessage: data['lastMessage'] as String?,
+      lastMessageAt: (data['lastMessageAt'] as Timestamp?)?.toDate(),
+      propertyName: data['propertyName'] as String?,
+      propertyAddress: data['propertyAddress'] as String?,
+      propertyImageUrls: (data['propertyImageUrls'] as List?)?.map((e) => e.toString()).toList(),
+      otherUserId: data['otherUserId'] as String? ?? '',
+      otherUserName: data['otherUserName'] as String?,
+      otherUserFirstName: data['otherUserFirstName'] as String?,
+      otherUserLastName: data['otherUserLastName'] as String?,
+      otherUserProfilePicture: data['otherUserProfilePicture'] as String?,
+    );
   }
 }

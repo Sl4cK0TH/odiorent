@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 // New ENUM for property status to match the database ENUM.
 // This improves type safety and prevents invalid status values.
 enum PropertyStatus {
@@ -51,9 +53,9 @@ class Property {
   final String? landlordEmail;
   final String? landlordFirstName;
   final String? landlordLastName;
-  final String? landlordUsername;
+  final String? landlordUserName;  // Changed from landlordUsername for consistency
   final String? landlordPhoneNumber;
-  final String? landlordProfilePicture;
+  final String? landlordProfilePictureUrl;  // Changed from landlordProfilePicture
 
   // New: Rating details (populated from the 'properties_with_avg_rating' view)
   final double averageRating;
@@ -77,9 +79,9 @@ class Property {
     this.landlordEmail, // New (nullable)
     this.landlordFirstName,
     this.landlordLastName,
-    this.landlordUsername,
+    this.landlordUserName,  // Changed
     this.landlordPhoneNumber,
-    this.landlordProfilePicture,
+    this.landlordProfilePictureUrl,  // Changed
     this.averageRating = 0.0, // New
     this.ratingCount = 0, // New
   });
@@ -128,11 +130,103 @@ class Property {
       landlordEmail: json['email'] as String?,
       landlordFirstName: json['first_name'] as String?,
       landlordLastName: json['last_name'] as String?,
-      landlordUsername: json['user_name'] as String?,
+      landlordUserName: json['user_name'] as String?,  // Changed
       landlordPhoneNumber: json['phone_number'] as String?,
-      landlordProfilePicture: json['profile_picture_url'] as String?,
+      landlordProfilePictureUrl: json['profile_picture_url'] as String?,  // Changed
       averageRating: (json['average_rating'] as num? ?? 0.0).toDouble(),
       ratingCount: json['rating_count'] as int? ?? 0,
+    );
+  }
+
+  /// --- `toFirestore` Method ---
+  /// Converts a Property object into a Map for Firestore
+  Map<String, dynamic> toFirestore() {
+    return {
+      'landlordId': landlordId,
+      'name': name,
+      'address': address,
+      'description': description,
+      'price': price,
+      'rooms': rooms,
+      'beds': beds,
+      'imageUrls': imageUrls,
+      'status': statusToString(status),
+      'createdAt': createdAt,
+      'approvedAt': approvedAt,
+      'averageRating': averageRating,
+      'ratingCount': ratingCount,
+    };
+  }
+
+  /// --- `fromFirestore` Factory ---
+  /// Creates a Property object from a Firestore DocumentSnapshot
+  factory Property.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Property(
+      id: doc.id,
+      landlordId: data['landlordId'] as String,
+      name: data['name'] as String,
+      address: data['address'] as String,
+      description: data['description'] as String,
+      price: (data['price'] as num).toDouble(),
+      rooms: data['rooms'] as int,
+      beds: data['beds'] as int,
+      imageUrls: List<String>.from(data['imageUrls'] as List<dynamic>? ?? []),
+      status: statusFromString(data['status'] as String),
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      approvedAt: (data['approvedAt'] as Timestamp?)?.toDate(),
+      averageRating: (data['averageRating'] as num? ?? 0.0).toDouble(),
+      ratingCount: data['ratingCount'] as int? ?? 0,
+    );
+  }
+
+  /// --- `copyWith` Method ---
+  /// Creates a copy of this Property with some fields replaced
+  Property copyWith({
+    String? id,
+    String? landlordId,
+    String? name,
+    String? address,
+    String? description,
+    double? price,
+    int? rooms,
+    int? beds,
+    List<String>? imageUrls,
+    PropertyStatus? status,
+    DateTime? createdAt,
+    DateTime? approvedAt,
+    String? landlordName,
+    String? landlordEmail,
+    String? landlordFirstName,
+    String? landlordLastName,
+    String? landlordUserName,
+    String? landlordPhoneNumber,
+    String? landlordProfilePictureUrl,
+    double? averageRating,
+    int? ratingCount,
+  }) {
+    return Property(
+      id: id ?? this.id,
+      landlordId: landlordId ?? this.landlordId,
+      name: name ?? this.name,
+      address: address ?? this.address,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      rooms: rooms ?? this.rooms,
+      beds: beds ?? this.beds,
+      imageUrls: imageUrls ?? this.imageUrls,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      approvedAt: approvedAt ?? this.approvedAt,
+      landlordName: landlordName ?? this.landlordName,
+      landlordEmail: landlordEmail ?? this.landlordEmail,
+      landlordFirstName: landlordFirstName ?? this.landlordFirstName,
+      landlordLastName: landlordLastName ?? this.landlordLastName,
+      landlordUserName: landlordUserName ?? this.landlordUserName,
+      landlordPhoneNumber: landlordPhoneNumber ?? this.landlordPhoneNumber,
+      landlordProfilePictureUrl: landlordProfilePictureUrl ?? this.landlordProfilePictureUrl,
+      averageRating: averageRating ?? this.averageRating,
+      ratingCount: ratingCount ?? this.ratingCount,
     );
   }
 }
