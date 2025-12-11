@@ -48,12 +48,12 @@ class FirebaseDatabaseService {
       for (var adminDoc in adminsQuery.docs) {
         final notificationRef = _firestore.collection('notifications').doc();
         batch.set(notificationRef, {
-          'recipientId': adminDoc.id,
+          'recipient_id': adminDoc.id,
           'title': 'New Property Submission',
           'body': 'A new property "${property.name}" is awaiting review.',
           'link': '/admin/property/${docRef.id}',
-          'isRead': false,
-          'createdAt': FieldValue.serverTimestamp(),
+          'is_read': false,
+          'created_at': FieldValue.serverTimestamp(),
         });
       }
 
@@ -113,11 +113,15 @@ class FirebaseDatabaseService {
   /// --- GET LANDLORD PROPERTIES ---
   Future<List<Property>> getLandlordProperties(String landlordId) async {
     try {
+      debugPrint("📍 Fetching properties for landlord: $landlordId");
+      
       final querySnapshot = await _firestore
           .collection('properties')
           .where('landlordId', isEqualTo: landlordId)
           .orderBy('createdAt', descending: true)
           .get();
+
+      debugPrint("📦 Found ${querySnapshot.docs.length} property documents");
 
       final properties = await Future.wait(
         querySnapshot.docs.map((doc) async {
@@ -131,7 +135,31 @@ class FirebaseDatabaseService {
       return properties;
     } catch (e) {
       debugPrint("❌ Error getting landlord properties: $e");
-      return [];
+      debugPrint("📌 If you see 'index' error, create index in Firebase Console");
+      debugPrint("   Collection: properties, Fields: landlordId (Ascending), createdAt (Descending)");
+      // Try fallback query without orderBy
+      try {
+        final fallbackSnapshot = await _firestore
+            .collection('properties')
+            .where('landlordId', isEqualTo: landlordId)
+            .get();
+        
+        debugPrint("⚠️ Using fallback query (no ordering): ${fallbackSnapshot.docs.length} docs");
+        
+        final properties = await Future.wait(
+          fallbackSnapshot.docs.map((doc) async {
+            final property = Property.fromFirestore(doc);
+            return await _enrichPropertyWithLandlordDetails(property);
+          }).toList(),
+        );
+        
+        // Sort in memory
+        properties.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return properties;
+      } catch (fallbackError) {
+        debugPrint("❌ Fallback query also failed: $fallbackError");
+        return [];
+      }
     }
   }
 
