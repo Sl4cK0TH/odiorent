@@ -199,11 +199,13 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   }
 
   Widget _buildLikeButton() {
+    final userId = _currentUserId!; // Assert once at the start
+    
     return StreamBuilder<bool>(
       stream: _databaseService.isVideoLikedStream(
         propertyId: widget.propertyId,
         videoUrl: widget.videoUrl,
-        userId: _currentUserId!,
+        userId: userId,
       ),
       builder: (context, isLikedSnapshot) {
         final isLiked = isLikedSnapshot.data ?? false;
@@ -232,13 +234,13 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                           await _databaseService.unlikeVideo(
                             propertyId: widget.propertyId,
                             videoUrl: widget.videoUrl,
-                            userId: _currentUserId!,
+                            userId: userId,
                           );
                         } else {
                           await _databaseService.likeVideo(
                             propertyId: widget.propertyId,
                             videoUrl: widget.videoUrl,
-                            userId: _currentUserId!,
+                            userId: userId,
                           );
                         }
                       } catch (e) {

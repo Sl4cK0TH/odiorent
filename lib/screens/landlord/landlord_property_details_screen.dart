@@ -4,6 +4,7 @@ import 'package:fluttertoast/fluttertoast.dart'; // Import for Fluttertoast
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/screens/landlord/landlord_edit_property_screen.dart'; // For navigation
 import 'package:odiorent/services/firebase_database_service.dart'; // Import for FirebaseDatabaseService
+import 'package:odiorent/widgets/video_player_widget.dart';
 
 class LandlordPropertyDetailsScreen extends StatelessWidget {
   final Property property;
@@ -170,6 +171,46 @@ class LandlordPropertyDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   const Divider(),
+
+                  // --- Virtual Tour ---
+                  if (property.videoUrls.isNotEmpty) ...[
+                    const Text(
+                      'Virtual Tour',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 220,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: property.videoUrls.length,
+                        itemBuilder: (context, index) {
+                          final videoUrl = property.videoUrls[index];
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              right: index < property.videoUrls.length - 1 ? 12 : 0,
+                            ),
+                            child: Container(
+                              width: MediaQuery.of(context).size.width - 32,
+                              decoration: BoxDecoration(
+                                color: Colors.black,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: VideoPlayerWidget(
+                                videoUrl: videoUrl,
+                                propertyId: property.id!,
+                                showLikeButton: false, // Landlord doesn't need like button
+                                autoPlay: false,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Divider(),
+                  ],
 
                   // --- Property Specs ---
                   const Text(

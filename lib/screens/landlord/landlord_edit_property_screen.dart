@@ -43,6 +43,13 @@ class _LandlordEditPropertyScreenState
   final List<XFile> _newImageFiles = [];
   final Set<int> _imagesToDelete = {}; // Track indices of images to delete
 
+  // Video management
+  List<String> _currentVideoUrls = [];
+  final List<XFile> _newVideoFiles = [];
+  final Set<int> _videosToDelete = {}; // Track indices of videos to delete
+  bool _isUploadingVideo = false;
+  double _videoUploadProgress = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +68,9 @@ class _LandlordEditPropertyScreenState
     
     // Initialize with current images
     _currentImageUrls = List.from(widget.property.imageUrls);
+    
+    // Initialize with current videos
+    _currentVideoUrls = List.from(widget.property.videoUrls);
 
     _fetchLandlordProfile();
   }
@@ -98,6 +108,18 @@ class _LandlordEditPropertyScreenState
     if (totalImages == 0) {
       Fluttertoast.showToast(
         msg: "Please add at least one image",
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+
+    // Validate videos
+    final remainingVideos = _currentVideoUrls.length - _videosToDelete.length;
+    final totalVideos = remainingVideos + _newVideoFiles.length;
+    
+    if (totalVideos != 2) {
+      Fluttertoast.showToast(
+        msg: "Exactly 2 videos required",
         backgroundColor: Colors.red,
       );
       return;
@@ -142,7 +164,41 @@ class _LandlordEditPropertyScreenState
       }
       finalImageUrls.addAll(newUploadedUrls);
 
-      // 3. Update property
+      // 3. Upload new videos with compression
+      setState(() => _isUploadingVideo = true);
+      List<String> newUploadedVideoUrls = [];
+      if (_newVideoFiles.isNotEmpty) {
+        for (int i = 0; i < _newVideoFiles.length; i++) {
+          final videoFile = _newVideoFiles[i];
+          setState(() => _videoUploadProgress = (i + 1) / _newVideoFiles.length * 0.5);
+          
+          final videoUrl = await _storageService.uploadVideoWithCompression(
+            videoFile: videoFile,
+            folder: 'virtual_tours',
+            userId: userId,
+            maxSizeMB: 50,
+            maxDurationSeconds: 180,
+            onProgress: (progress) {
+              setState(() {
+                _videoUploadProgress = ((i + progress) / _newVideoFiles.length);
+              });
+            },
+          );
+          newUploadedVideoUrls.add(videoUrl);
+        }
+      }
+      setState(() => _isUploadingVideo = false);
+
+      // 4. Build final video URLs list (remove deleted, add new)
+      List<String> finalVideoUrls = [];
+      for (int i = 0; i < _currentVideoUrls.length; i++) {
+        if (!_videosToDelete.contains(i)) {
+          finalVideoUrls.add(_currentVideoUrls[i]);
+        }
+      }
+      finalVideoUrls.addAll(newUploadedVideoUrls);
+
+      // 5. Update property
       final updatedProperty = Property(
         id: widget.property.id,
         landlordId: widget.property.landlordId,
@@ -154,7 +210,7 @@ class _LandlordEditPropertyScreenState
         beds: int.parse(_bedsController.text.trim()),
         showers: int.parse(_showersController.text.trim()),
         imageUrls: finalImageUrls,
-        videoUrls: widget.property.videoUrls, // Keep existing videos for now
+        videoUrls: finalVideoUrls,
         status: widget.property.status,
         createdAt: widget.property.createdAt,
         approvedAt: widget.property.approvedAt,
@@ -304,6 +360,114 @@ class _LandlordEditPropertyScreenState
         backgroundColor: Colors.red,
       );
     }
+  }
+
+  // === VIDEO MANAGEMENT METHODS ===
+
+  Future<void> _pickVideo({required ImageSource source}) async {
+    final totalVideos = _currentVideoUrls.length - _videosToDelete.length + _newVideoFiles.length;
+    
+    if (totalVideos >= 2) {
+      Fluttertoast.showToast(
+        msg: "Maximum 2 videos allowed",
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+
+    try {
+      final XFile? pickedFile = await _picker.pickVideo(source: source);
+
+      if (pickedFile != null) {
+        // Validate video
+        final validation = await _storageService.validateVideo(
+          videoFile: pickedFile,
+          maxSizeMB: 50,
+          maxDurationSeconds: 180,
+        );
+
+        if (validation != null) {
+          if (mounted) {
+            Fluttertoast.showToast(
+              msg: validation,
+              backgroundColor: Colors.red,
+              toastLength: Toast.LENGTH_LONG,
+            );
+          }
+          return;
+        }
+
+        setState(() {
+          _newVideoFiles.add(pickedFile);
+        });
+
+        Fluttertoast.showToast(
+          msg: "Video added successfully",
+          backgroundColor: Colors.green,
+        );
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: "Error selecting video: $e",
+        backgroundColor: Colors.red,
+      );
+    }
+  }
+
+  void _showVideoSourceDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Video Source'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.video_library),
+              title: const Text('Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickVideo(source: ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.videocam),
+              title: const Text('Record Video'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickVideo(source: ImageSource.camera);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _removeNewVideo(int index) {
+    setState(() {
+      _newVideoFiles.removeAt(index);
+    });
+  }
+
+  void _toggleDeleteCurrentVideo(int index) {
+    final totalVideos = _currentVideoUrls.length - _videosToDelete.length - 1 + _newVideoFiles.length;
+    
+    if (totalVideos < 2 && !_videosToDelete.contains(index)) {
+      Fluttertoast.showToast(
+        msg: "Must keep at least 2 videos",
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+
+    setState(() {
+      if (_videosToDelete.contains(index)) {
+        _videosToDelete.remove(index);
+      } else {
+        _videosToDelete.add(index);
+      }
+    });
   }
 
   @override
@@ -534,6 +698,144 @@ class _LandlordEditPropertyScreenState
                 'Total: ${(_currentImageUrls.length - _imagesToDelete.length) + _newImageFiles.length} images',
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
+              
+              const SizedBox(height: 32),
+
+              // === VIRTUAL TOUR VIDEOS ===
+              const Text(
+                'Virtual Tour Videos (Required: 2)',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              
+              // Current videos
+              if (_currentVideoUrls.isNotEmpty)
+                ...List.generate(_currentVideoUrls.length, (index) {
+                  final isMarkedForDelete = _videosToDelete.contains(index);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: isMarkedForDelete ? Colors.red : Colors.grey,
+                          width: isMarkedForDelete ? 2 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(
+                            isMarkedForDelete ? Icons.delete : Icons.play_circle_outline,
+                            color: isMarkedForDelete ? Colors.red : Colors.white,
+                            size: 32,
+                          ),
+                        ),
+                        title: Text(
+                          'Video ${index + 1}',
+                          style: TextStyle(
+                            decoration: isMarkedForDelete ? TextDecoration.lineThrough : null,
+                          ),
+                        ),
+                        subtitle: const Text('Current video'),
+                        trailing: IconButton(
+                          icon: Icon(
+                            isMarkedForDelete ? Icons.restore : Icons.delete,
+                            color: isMarkedForDelete ? Colors.green : Colors.red,
+                          ),
+                          onPressed: () => _toggleDeleteCurrentVideo(index),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+
+              // New videos
+              if (_newVideoFiles.isNotEmpty)
+                ...List.generate(_newVideoFiles.length, (index) {
+                  final video = _newVideoFiles[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.green, width: 2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(
+                            Icons.play_circle_outline,
+                            color: Colors.green,
+                            size: 32,
+                          ),
+                        ),
+                        title: Text(
+                          video.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: FutureBuilder<int>(
+                          future: video.readAsBytes().then((bytes) => bytes.length),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasData) {
+                              final sizeMB = snapshot.data! / (1024 * 1024);
+                              return Text('${sizeMB.toStringAsFixed(2)} MB (NEW)');
+                            }
+                            return const Text('Calculating size...');
+                          },
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _removeNewVideo(index),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _isLoading || ((_currentVideoUrls.length - _videosToDelete.length + _newVideoFiles.length) >= 2)
+                    ? null
+                    : _showVideoSourceDialog,
+                icon: const Icon(Icons.video_library),
+                label: Text(
+                  'Add Video (${(_currentVideoUrls.length - _videosToDelete.length) + _newVideoFiles.length}/2)',
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+              Text(
+                'Total: ${(_currentVideoUrls.length - _videosToDelete.length) + _newVideoFiles.length} videos',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+
+              if (_isUploadingVideo)
+                Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    const Text('Compressing and uploading videos...'),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: _videoUploadProgress,
+                      backgroundColor: Colors.grey[300],
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4CAF50)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text('${(_videoUploadProgress * 100).toStringAsFixed(0)}%'),
+                  ],
+                ),
               
               const SizedBox(height: 24),
               

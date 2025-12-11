@@ -29,42 +29,79 @@ class PropertyCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- Property Image ---
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(15.0),
-            ),
-            child: Image.network(
-              // Use the first image as the thumbnail
-              // Add a placeholder if no images exist
-              property.imageUrls.isNotEmpty
-                  ? property.imageUrls.first
-                  : 'https://placehold.co/600x400/grey/white?text=No+Image',
-              height: 180,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              // Show a loading indicator while the image loads
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return const SizedBox(
+          // --- Property Image with Video Badge ---
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(15.0),
+                ),
+                child: Image.network(
+                  // Use the first image as the thumbnail
+                  // Add a placeholder if no images exist
+                  property.imageUrls.isNotEmpty
+                      ? property.imageUrls.first
+                      : 'https://placehold.co/600x400/grey/white?text=No+Image',
                   height: 180,
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              },
-              // Show a placeholder icon if the image fails to load
-              errorBuilder: (context, error, stackTrace) {
-                return const SizedBox(
-                  height: 180,
-                  child: Center(
-                    child: Icon(
-                      Icons.broken_image,
-                      size: 40,
-                      color: Colors.grey,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  // Show a loading indicator while the image loads
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const SizedBox(
+                      height: 180,
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  },
+                  // Show a placeholder icon if the image fails to load
+                  errorBuilder: (context, error, stackTrace) {
+                    return const SizedBox(
+                      height: 180,
+                      child: Center(
+                        child: Icon(
+                          Icons.broken_image,
+                          size: 40,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              
+              // Video Badge
+              if (property.videoUrls.isNotEmpty)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.videocam,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Virtual Tour',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+            ],
           ),
 
           // --- Property Details ---

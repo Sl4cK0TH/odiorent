@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
+import 'package:odiorent/widgets/video_player_widget.dart';
 
 class AdminPropertyViewScreen extends StatefulWidget {
   final Property property;
@@ -150,7 +151,49 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
                     widget.property.description,
                     style: TextStyle(fontSize: 16, height: 1.5),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
+
+                  // --- Virtual Tour ---
+                  if (widget.property.videoUrls.isNotEmpty) ...[
+                    const Text(
+                      'Virtual Tour',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 220,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: widget.property.videoUrls.length,
+                        itemBuilder: (context, index) {
+                          final videoUrl = widget.property.videoUrls[index];
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              right: index < widget.property.videoUrls.length - 1 ? 12 : 0,
+                            ),
+                            child: Container(
+                              width: MediaQuery.of(context).size.width - 32,
+                              decoration: BoxDecoration(
+                                color: Colors.black,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: VideoPlayerWidget(
+                                videoUrl: videoUrl,
+                                propertyId: widget.property.id!,
+                                showLikeButton: false, // Admin doesn't need like button
+                                autoPlay: false,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
+                  const SizedBox(height: 8),
                   if (_isLoading)
                     const Center(
                       child: CircularProgressIndicator(color: primaryGreen),

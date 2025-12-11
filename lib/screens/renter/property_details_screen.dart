@@ -4,6 +4,7 @@ import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:odiorent/screens/shared/chat_room_screen.dart';
+import 'package:odiorent/widgets/video_player_widget.dart';
 
 class PropertyDetailsScreen extends StatefulWidget {
   final Property property;
@@ -438,6 +439,46 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                     style: const TextStyle(fontSize: 16, height: 1.5),
                   ),
                   const SizedBox(height: 24),
+
+                  // --- Virtual Tour ---
+                  if (property.videoUrls.isNotEmpty) ...[
+                    const Text(
+                      'Virtual Tour',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const Divider(thickness: 0.5, height: 20),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 220,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: property.videoUrls.length,
+                        itemBuilder: (context, index) {
+                          final videoUrl = property.videoUrls[index];
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              right: index < property.videoUrls.length - 1 ? 12 : 0,
+                            ),
+                            child: Container(
+                              width: MediaQuery.of(context).size.width - 32,
+                              decoration: BoxDecoration(
+                                color: Colors.black,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: VideoPlayerWidget(
+                                videoUrl: videoUrl,
+                                propertyId: property.id!,
+                                showLikeButton: true,
+                                autoPlay: false,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
                   // --- Ratings & Reviews ---
                   Row(
