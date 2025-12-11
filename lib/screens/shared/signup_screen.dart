@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 // These imports are now correct
 import 'package:odiorent/widgets/form_card.dart';
 import 'package:odiorent/widgets/custom_button.dart';
-import 'package:odiorent/services/auth_service.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/screens/shared/login_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -65,8 +65,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
       phoneNumber = '+63$phoneNumber';
 
-      // Call AuthService
-      final authService = AuthService();
+      // Call FirebaseAuthService
+      final authService = FirebaseAuthService();
       await authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,

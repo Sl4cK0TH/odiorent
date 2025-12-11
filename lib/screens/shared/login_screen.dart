@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:odiorent/widgets/custom_button.dart';
 import 'package:odiorent/widgets/login_form_card.dart';
-import 'package:odiorent/services/auth_service.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -43,8 +43,8 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Call AuthService
-      final authService = AuthService();
+      // Call FirebaseAuthService
+      final authService = FirebaseAuthService();
       final input = _usernameEmailController.text.trim();
 
       // Determine if input is email or username
