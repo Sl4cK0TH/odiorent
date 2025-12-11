@@ -117,9 +117,9 @@ class _LandlordEditPropertyScreenState
     final remainingVideos = _currentVideoUrls.length - _videosToDelete.length;
     final totalVideos = remainingVideos + _newVideoFiles.length;
     
-    if (totalVideos != 2) {
+    if (totalVideos != 1) {
       Fluttertoast.showToast(
-        msg: "Exactly 2 videos required",
+        msg: "Exactly 1 video required",
         backgroundColor: Colors.red,
       );
       return;
@@ -367,9 +367,9 @@ class _LandlordEditPropertyScreenState
   Future<void> _pickVideo({required ImageSource source}) async {
     final totalVideos = _currentVideoUrls.length - _videosToDelete.length + _newVideoFiles.length;
     
-    if (totalVideos >= 2) {
+    if (totalVideos >= 1) {
       Fluttertoast.showToast(
-        msg: "Maximum 2 videos allowed",
+        msg: "Maximum 1 video allowed",
         backgroundColor: Colors.orange,
       );
       return;
@@ -453,9 +453,9 @@ class _LandlordEditPropertyScreenState
   void _toggleDeleteCurrentVideo(int index) {
     final totalVideos = _currentVideoUrls.length - _videosToDelete.length - 1 + _newVideoFiles.length;
     
-    if (totalVideos < 2 && !_videosToDelete.contains(index)) {
+    if (totalVideos < 1 && !_videosToDelete.contains(index)) {
       Fluttertoast.showToast(
-        msg: "Must keep at least 2 videos",
+        msg: "Must keep at least 1 video",
         backgroundColor: Colors.orange,
       );
       return;
@@ -701,9 +701,9 @@ class _LandlordEditPropertyScreenState
               
               const SizedBox(height: 32),
 
-              // === VIRTUAL TOUR VIDEOS ===
+              // === VIRTUAL TOUR VIDEO ===
               const Text(
-                'Virtual Tour Videos (Required: 2)',
+                'Virtual Tour Video (Required: 1)',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
@@ -806,18 +806,18 @@ class _LandlordEditPropertyScreenState
 
               const SizedBox(height: 12),
               OutlinedButton.icon(
-                onPressed: _isLoading || ((_currentVideoUrls.length - _videosToDelete.length + _newVideoFiles.length) >= 2)
+                onPressed: _isLoading || ((_currentVideoUrls.length - _videosToDelete.length + _newVideoFiles.length) >= 1)
                     ? null
                     : _showVideoSourceDialog,
                 icon: const Icon(Icons.video_library),
                 label: Text(
-                  'Add Video (${(_currentVideoUrls.length - _videosToDelete.length) + _newVideoFiles.length}/2)',
+                  'Add Video (${(_currentVideoUrls.length - _videosToDelete.length) + _newVideoFiles.length}/1)',
                 ),
               ),
               
               const SizedBox(height: 8),
               Text(
-                'Total: ${(_currentVideoUrls.length - _videosToDelete.length) + _newVideoFiles.length} videos',
+                'Total: ${(_currentVideoUrls.length - _videosToDelete.length) + _newVideoFiles.length} video',
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
 

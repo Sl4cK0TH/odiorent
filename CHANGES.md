@@ -10,14 +10,15 @@
   - ✅ CloudinaryService: video upload, automatic compression (50MB max, 3min max), validation
   - ✅ Video like methods: `likeVideo()`, `unlikeVideo()`, `isVideoLiked()`, `getVideoLikeCount()` with real-time streams
   - ✅ VideoPlayerWidget: Chewie player, fullscreen (portrait/landscape), like button with live count
-  - ✅ Add Property: Video picker (gallery/camera), exactly 2 videos required, compression progress
-  - ✅ Edit Property: Full video editing - add/replace/delete videos, maintain 2 videos requirement
-  - ✅ Property Details (Renter): Horizontal video carousel, fullscreen playback, like functionality
+  - ✅ Add Property: Video picker (gallery/camera), **exactly 1 video required**, compression progress
+  - ✅ Edit Property: Full video editing - add/replace/delete video, maintain 1 video requirement
+  - ✅ Property Details (Renter): Video player, fullscreen playback, like functionality
   - ✅ Property Details (Landlord): Video preview without like button
   - ✅ Admin Property View: Video review before approval
   - ✅ Property Card: "Virtual Tour" badge with camera icon on properties with videos
 
 - **Technical Features**:
+  - **1 video required per property** (simplified from 2)
   - Automatic video compression before upload
   - Video validation: file size, duration, format
   - Real-time like count updates via Firestore streams
@@ -27,9 +28,9 @@
   - Individual video likes tracked in `videoLikes` collection
 
 - **User Experience**:
-  - Landlords: Upload 2 videos via gallery or camera recording
-  - Renters: Browse virtual tours, like individual videos
-  - Admins: Review videos before approving properties
+  - Landlords: Upload 1 video via gallery or camera recording
+  - Renters: Watch virtual tour, like video
+  - Admins: Review video before approving properties
   - Visual indicator on property cards showing virtual tour availability
 
 ### Ratings & Reviews System - Optional Fields

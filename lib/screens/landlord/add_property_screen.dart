@@ -80,9 +80,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
   // --- Video Picker Functions ---
   Future<void> _pickVideo({required ImageSource source}) async {
-    if (_selectedVideos.length >= 2) {
+    if (_selectedVideos.isNotEmpty) {
       Fluttertoast.showToast(
-        msg: "Maximum 2 videos allowed",
+        msg: "Maximum 1 video allowed",
         backgroundColor: Colors.orange,
       );
       return;
@@ -173,9 +173,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       );
       return;
     }
-    if (_selectedVideos.length != 2) {
+    if (_selectedVideos.length != 1) {
       Fluttertoast.showToast(
-        msg: "Please upload exactly 2 videos for virtual tour.",
+        msg: "Please upload exactly 1 video for virtual tour.",
         backgroundColor: Colors.red,
       );
       return;
@@ -477,12 +477,12 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
                   // --- Virtual Tour Videos Section ---
                   const Text(
-                    'Virtual Tour Videos (Required)',
+                    'Virtual Tour Video (Required)',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Upload exactly 2 videos (max 3 minutes each, 50MB max)',
+                    'Upload 1 video (max 3 minutes, 50MB max)',
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 8),
@@ -491,9 +491,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                       foregroundColor: primaryGreen,
                       side: const BorderSide(color: primaryGreen),
                     ),
-                    onPressed: _selectedVideos.length < 2 ? _showVideoSourceDialog : null,
+                    onPressed: _selectedVideos.isEmpty ? _showVideoSourceDialog : null,
                     icon: const Icon(Icons.video_library),
-                    label: Text('Add Video (${_selectedVideos.length}/2)'),
+                    label: Text('Add Video (${_selectedVideos.length}/1)'),
                   ),
                   const SizedBox(height: 16),
 
