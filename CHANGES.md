@@ -2,6 +2,25 @@
 
 ## [2025-12-11 - Latest Updates]
 
+### Virtual Tour Feature - IN PROGRESS (Part 1)
+- **Added core infrastructure for virtual tour videos**:
+  - ✅ Added video packages: `video_player: ^2.9.2`, `chewie: ^1.8.5`, `video_compress: ^3.1.3`, `path_provider: ^2.1.4`
+  - ✅ Extended Property model with `videoUrls` field (List<String>)
+  - ✅ Created VideoLike model for tracking video likes per user
+  - ✅ CloudinaryService video upload with automatic compression (50MB max, 3min max)
+  - ✅ Video validation: file size, duration, format checking
+  - ✅ FirebaseDatabaseService video like methods: `likeVideo()`, `unlikeVideo()`, `isVideoLiked()`, `getVideoLikeCount()`
+  - ✅ Created VideoPlayerWidget with Chewie player, fullscreen support, like button with count
+  - ✅ Updated add_property_screen.dart: Video picker (gallery/camera), exactly 2 videos required, upload progress
+  - ⚠️ REMAINING: Update property details screens (renter/landlord/admin), edit property screen, property card indicator
+
+- **Add Property Screen Updates**:
+  - Video source selection dialog (Gallery or Record)
+  - Video preview with file info (name, size)
+  - Compression progress indicator
+  - Validation: exactly 2 videos required, 50MB max, 3 minutes max
+  - Videos uploaded to Cloudinary folder: `virtual_tours/`
+
 ### Ratings & Reviews System - Optional Fields
 - **Implemented comprehensive ratings and reviews feature** for renters:
   - ✅ Added `addPropertyRating()`, `getPropertyRatings()`, `getUserRatingForProperty()` methods in FirebaseDatabaseService

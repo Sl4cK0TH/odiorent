@@ -154,6 +154,7 @@ class _LandlordEditPropertyScreenState
         beds: int.parse(_bedsController.text.trim()),
         showers: int.parse(_showersController.text.trim()),
         imageUrls: finalImageUrls,
+        videoUrls: widget.property.videoUrls, // Keep existing videos for now
         status: widget.property.status,
         createdAt: widget.property.createdAt,
         approvedAt: widget.property.approvedAt,

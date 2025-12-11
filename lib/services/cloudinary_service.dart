@@ -1,7 +1,9 @@
 import 'dart:typed_data';
+import 'dart:io';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_compress/video_compress.dart';
 
 /// Cloudinary Storage Service
 /// FREE alternative to Firebase Storage
@@ -266,5 +268,176 @@ class CloudinaryService {
       '/upload/',
       '/upload/$transformation/',
     );
+  }
+
+  /// Compress video if larger than maxSizeMB
+  /// Returns compressed video file or original if already small enough
+  Future<XFile> compressVideoIfNeeded({
+    required XFile videoFile,
+    int maxSizeMB = 50,
+    VideoQuality quality = VideoQuality.MediumQuality,
+  }) async {
+    try {
+      // Check original file size
+      final bytes = await videoFile.readAsBytes();
+      final sizeMB = bytes.length / (1024 * 1024);
+
+      debugPrint('📹 Original video size: ${sizeMB.toStringAsFixed(2)} MB');
+
+      if (sizeMB <= maxSizeMB) {
+        debugPrint('✅ Video size OK, no compression needed');
+        return videoFile;
+      }
+
+      debugPrint('🔄 Compressing video from ${sizeMB.toStringAsFixed(2)} MB...');
+
+      // Compress video
+      final info = await VideoCompress.compressVideo(
+        videoFile.path,
+        quality: quality,
+        deleteOrigin: false,
+      );
+
+      if (info == null || info.file == null) {
+        debugPrint('⚠️ Compression failed, using original video');
+        return videoFile;
+      }
+
+      final compressedSizeMB = info.filesize! / (1024 * 1024);
+      debugPrint('✅ Video compressed to ${compressedSizeMB.toStringAsFixed(2)} MB');
+
+      // If still too large, try lower quality
+      if (compressedSizeMB > maxSizeMB && quality != VideoQuality.LowQuality) {
+        debugPrint('⚠️ Still too large, trying lower quality...');
+        return await compressVideoIfNeeded(
+          videoFile: XFile(info.file!.path),
+          maxSizeMB: maxSizeMB,
+          quality: VideoQuality.LowQuality,
+        );
+      }
+
+      return XFile(info.file!.path);
+    } catch (e) {
+      debugPrint('❌ Error compressing video: $e');
+      return videoFile; // Return original on error
+    }
+  }
+
+  /// Validate video file
+  /// Returns error message or null if valid
+  Future<String?> validateVideo({
+    required XFile videoFile,
+    int maxSizeMB = 50,
+    int maxDurationSeconds = 180, // 3 minutes
+  }) async {
+    try {
+      // Check file size
+      final bytes = await videoFile.readAsBytes();
+      final sizeMB = bytes.length / (1024 * 1024);
+
+      if (sizeMB > maxSizeMB) {
+        return 'Video is too large (${sizeMB.toStringAsFixed(1)} MB). Maximum is $maxSizeMB MB.';
+      }
+
+      // Check file extension
+      final extension = videoFile.path.split('.').last.toLowerCase();
+      const validExtensions = ['mp4', 'mov', 'avi', 'webm', 'm4v'];
+      
+      if (!validExtensions.contains(extension)) {
+        return 'Invalid video format. Supported formats: ${validExtensions.join(", ")}';
+      }
+
+      // Get video info for duration check
+      final info = await VideoCompress.getMediaInfo(videoFile.path);
+      
+      if (info.duration != null) {
+        final durationSeconds = info.duration! / 1000; // Convert ms to seconds
+        
+        if (durationSeconds > maxDurationSeconds) {
+          final minutes = (durationSeconds / 60).toStringAsFixed(1);
+          final maxMinutes = (maxDurationSeconds / 60).toStringAsFixed(0);
+          return 'Video is too long ($minutes min). Maximum is $maxMinutes minutes.';
+        }
+      }
+
+      return null; // Valid
+    } catch (e) {
+      debugPrint('❌ Error validating video: $e');
+      return 'Error validating video: $e';
+    }
+  }
+
+  /// Upload video with compression and validation
+  Future<String> uploadVideoWithCompression({
+    required XFile videoFile,
+    required String folder,
+    String? userId,
+    int maxSizeMB = 50,
+    int maxDurationSeconds = 180,
+    Function(double)? onProgress,
+  }) async {
+    try {
+      // Validate video
+      final validationError = await validateVideo(
+        videoFile: videoFile,
+        maxSizeMB: maxSizeMB,
+        maxDurationSeconds: maxDurationSeconds,
+      );
+
+      if (validationError != null) {
+        throw Exception(validationError);
+      }
+
+      // Compress if needed
+      onProgress?.call(0.1);
+      final compressedVideo = await compressVideoIfNeeded(
+        videoFile: videoFile,
+        maxSizeMB: maxSizeMB,
+      );
+
+      // Upload to Cloudinary
+      onProgress?.call(0.5);
+      final url = await uploadXFile(
+        file: compressedVideo,
+        folder: folder,
+        userId: userId,
+      );
+
+      onProgress?.call(1.0);
+      
+      // Cleanup compressed file if different from original
+      if (compressedVideo.path != videoFile.path) {
+        try {
+          await File(compressedVideo.path).delete();
+        } catch (e) {
+          debugPrint('⚠️ Could not delete temp file: $e');
+        }
+      }
+
+      return url;
+    } catch (e) {
+      debugPrint('❌ Error uploading video: $e');
+      rethrow;
+    }
+  }
+
+  /// Cancel ongoing video compression
+  Future<void> cancelVideoCompression() async {
+    try {
+      await VideoCompress.cancelCompression();
+      debugPrint('✅ Video compression cancelled');
+    } catch (e) {
+      debugPrint('❌ Error cancelling compression: $e');
+    }
+  }
+
+  /// Delete all temporary compressed videos
+  Future<void> deleteAllTempVideos() async {
+    try {
+      await VideoCompress.deleteAllCache();
+      debugPrint('✅ Deleted all temp videos');
+    } catch (e) {
+      debugPrint('❌ Error deleting temp videos: $e');
+    }
   }
 }

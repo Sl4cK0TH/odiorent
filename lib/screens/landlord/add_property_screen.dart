@@ -47,7 +47,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   // State variables
   bool _isLoading = false;
   final List<File> _selectedImages = []; // To hold the image files
+  final List<XFile> _selectedVideos = []; // To hold the video files
   final ImagePicker _picker = ImagePicker(); // The image picker instance
+  bool _isUploadingVideo = false;
+  double _videoUploadProgress = 0.0;
 
   @override
   void dispose() {
@@ -75,12 +78,104 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     }
   }
 
+  // --- Video Picker Functions ---
+  Future<void> _pickVideo({required ImageSource source}) async {
+    if (_selectedVideos.length >= 2) {
+      Fluttertoast.showToast(
+        msg: "Maximum 2 videos allowed",
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+
+    try {
+      final XFile? pickedFile = await _picker.pickVideo(source: source);
+
+      if (pickedFile != null) {
+        // Validate video
+        final validation = await _storageService.validateVideo(
+          videoFile: pickedFile,
+          maxSizeMB: 50,
+          maxDurationSeconds: 180, // 3 minutes
+        );
+
+        if (validation != null) {
+          if (mounted) {
+            Fluttertoast.showToast(
+              msg: validation,
+              backgroundColor: Colors.red,
+              toastLength: Toast.LENGTH_LONG,
+            );
+          }
+          return;
+        }
+
+        setState(() {
+          _selectedVideos.add(pickedFile);
+        });
+
+        Fluttertoast.showToast(
+          msg: "Video added successfully",
+          backgroundColor: Colors.green,
+        );
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: "Error selecting video: $e",
+        backgroundColor: Colors.red,
+      );
+    }
+  }
+
+  void _showVideoSourceDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Video Source'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.video_library),
+              title: const Text('Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickVideo(source: ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.videocam),
+              title: const Text('Record Video'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickVideo(source: ImageSource.camera);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _removeVideo(int index) {
+    setState(() {
+      _selectedVideos.removeAt(index);
+    });
+  }
+
   // --- Create Property Function ---
   Future<void> _handleCreateProperty() async {
     if (!_formKey.currentState!.validate()) return; // Check form
     if (_selectedImages.isEmpty) {
       Fluttertoast.showToast(
         msg: "Please upload at least one image.",
+        backgroundColor: Colors.red,
+      );
+      return;
+    }
+    if (_selectedVideos.length != 2) {
+      Fluttertoast.showToast(
+        msg: "Please upload exactly 2 videos for virtual tour.",
         backgroundColor: Colors.red,
       );
       return;
@@ -113,7 +208,30 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       }).toList();
       final imageUrls = await Future.wait(uploadTasks);
 
-      // 2. Create Property Object
+      // 2. Upload Videos with compression
+      setState(() => _isUploadingVideo = true);
+      final List<String> videoUrls = [];
+      for (int i = 0; i < _selectedVideos.length; i++) {
+        final videoFile = _selectedVideos[i];
+        setState(() => _videoUploadProgress = (i + 1) / _selectedVideos.length * 0.5);
+        
+        final videoUrl = await _storageService.uploadVideoWithCompression(
+          videoFile: videoFile,
+          folder: 'virtual_tours',
+          userId: userId,
+          maxSizeMB: 50,
+          maxDurationSeconds: 180,
+          onProgress: (progress) {
+            setState(() {
+              _videoUploadProgress = ((i + progress) / _selectedVideos.length);
+            });
+          },
+        );
+        videoUrls.add(videoUrl);
+      }
+      setState(() => _isUploadingVideo = false);
+
+      // 3. Create Property Object
       final fullAddress = "${_streetAddressController.text.trim()}, $_selectedBarangay, Odiongan, Romblon";
       final newProperty = Property(
         landlordId: userId,
@@ -125,11 +243,12 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         beds: int.parse(_bedsController.text.trim()),
         showers: int.parse(_showersController.text.trim()),
         imageUrls: imageUrls,
+        videoUrls: videoUrls,
         status: PropertyStatus.pending, // Always 'pending' on creation
         createdAt: DateTime.now().toUtc(), // Set creation date
       );
 
-      // 3. Save to Database
+      // 4. Save to Database
       await _dbService.createProperty(newProperty);
 
       if (!mounted) return;
@@ -139,7 +258,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         backgroundColor: Colors.green,
       );
 
-      // 4. Go back to home screen
+      // 5. Go back to home screen
       // Pass 'true' back to tell the home screen to refresh
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -354,6 +473,59 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                         },
                       ),
                     ),
+                  const SizedBox(height: 24),
+
+                  // --- Virtual Tour Videos Section ---
+                  const Text(
+                    'Virtual Tour Videos (Required)',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Upload exactly 2 videos (max 3 minutes each, 50MB max)',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryGreen,
+                      side: const BorderSide(color: primaryGreen),
+                    ),
+                    onPressed: _selectedVideos.length < 2 ? _showVideoSourceDialog : null,
+                    icon: const Icon(Icons.video_library),
+                    label: Text('Add Video (${_selectedVideos.length}/2)'),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // --- Video Preview ---
+                  if (_selectedVideos.isNotEmpty)
+                    Column(
+                      children: _selectedVideos.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final video = entry.value;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: _buildVideoPreview(video, index),
+                        );
+                      }).toList(),
+                    ),
+
+                  if (_isUploadingVideo)
+                    Column(
+                      children: [
+                        const SizedBox(height: 16),
+                        const Text('Compressing and uploading videos...'),
+                        const SizedBox(height: 8),
+                        LinearProgressIndicator(
+                          value: _videoUploadProgress,
+                          backgroundColor: Colors.grey[300],
+                          valueColor: const AlwaysStoppedAnimation<Color>(primaryGreen),
+                        ),
+                        const SizedBox(height: 4),
+                        Text('${(_videoUploadProgress * 100).toStringAsFixed(0)}%'),
+                      ],
+                    ),
+
                   const SizedBox(height: 32),
                 ],
               ),
@@ -379,6 +551,50 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Build video preview widget
+  Widget _buildVideoPreview(XFile video, int index) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: ListTile(
+        leading: Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(
+            Icons.play_circle_outline,
+            color: Colors.white,
+            size: 32,
+          ),
+        ),
+        title: Text(
+          video.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: FutureBuilder<int>(
+          future: video.readAsBytes().then((bytes) => bytes.length),
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              final sizeMB = snapshot.data! / (1024 * 1024);
+              return Text('${sizeMB.toStringAsFixed(2)} MB');
+            }
+            return const Text('Calculating size...');
+          },
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete, color: Colors.red),
+          onPressed: () => _removeVideo(index),
+        ),
       ),
     );
   }

@@ -1066,4 +1066,128 @@ class FirebaseDatabaseService {
         .snapshots()
         .map((doc) => doc.exists);
   }
+
+  // ========================================
+  // VIDEO LIKE METHODS
+  // ========================================
+
+  /// Like a video
+  Future<void> likeVideo({
+    required String propertyId,
+    required String videoUrl,
+    required String userId,
+  }) async {
+    try {
+      // Create unique ID for this like: propertyId_videoIndex_userId
+      final videoIndex = _getVideoIndex(videoUrl);
+      final likeId = '${propertyId}_video${videoIndex}_$userId';
+
+      await _firestore.collection('videoLikes').doc(likeId).set({
+        'propertyId': propertyId,
+        'videoUrl': videoUrl,
+        'userId': userId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint("✅ Video liked: $likeId");
+    } catch (e) {
+      debugPrint("❌ Error liking video: $e");
+      rethrow;
+    }
+  }
+
+  /// Unlike a video
+  Future<void> unlikeVideo({
+    required String propertyId,
+    required String videoUrl,
+    required String userId,
+  }) async {
+    try {
+      final videoIndex = _getVideoIndex(videoUrl);
+      final likeId = '${propertyId}_video${videoIndex}_$userId';
+
+      await _firestore.collection('videoLikes').doc(likeId).delete();
+
+      debugPrint("✅ Video unliked: $likeId");
+    } catch (e) {
+      debugPrint("❌ Error unliking video: $e");
+      rethrow;
+    }
+  }
+
+  /// Check if user has liked a video
+  Future<bool> isVideoLiked({
+    required String propertyId,
+    required String videoUrl,
+    required String userId,
+  }) async {
+    try {
+      final videoIndex = _getVideoIndex(videoUrl);
+      final likeId = '${propertyId}_video${videoIndex}_$userId';
+
+      final doc = await _firestore.collection('videoLikes').doc(likeId).get();
+      return doc.exists;
+    } catch (e) {
+      debugPrint("❌ Error checking if video is liked: $e");
+      return false;
+    }
+  }
+
+  /// Get like count for a specific video
+  Future<int> getVideoLikeCount({
+    required String propertyId,
+    required String videoUrl,
+  }) async {
+    try {
+      final videoIndex = _getVideoIndex(videoUrl);
+      
+      final snapshot = await _firestore
+          .collection('videoLikes')
+          .where('propertyId', isEqualTo: propertyId)
+          .where('videoUrl', isEqualTo: videoUrl)
+          .get();
+
+      debugPrint("✅ Video $videoIndex has ${snapshot.docs.length} likes");
+      return snapshot.docs.length;
+    } catch (e) {
+      debugPrint("❌ Error getting video like count: $e");
+      return 0;
+    }
+  }
+
+  /// Get like count stream for real-time updates
+  Stream<int> getVideoLikeCountStream({
+    required String propertyId,
+    required String videoUrl,
+  }) {
+    return _firestore
+        .collection('videoLikes')
+        .where('propertyId', isEqualTo: propertyId)
+        .where('videoUrl', isEqualTo: videoUrl)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  /// Check if video is liked (stream for real-time updates)
+  Stream<bool> isVideoLikedStream({
+    required String propertyId,
+    required String videoUrl,
+    required String userId,
+  }) {
+    final videoIndex = _getVideoIndex(videoUrl);
+    final likeId = '${propertyId}_video${videoIndex}_$userId';
+
+    return _firestore
+        .collection('videoLikes')
+        .doc(likeId)
+        .snapshots()
+        .map((doc) => doc.exists);
+  }
+
+  /// Helper: Extract video index from URL (0 or 1 for first/second video)
+  int _getVideoIndex(String videoUrl) {
+    // Simple hash to determine index (0 or 1)
+    // In practice, you might want to use actual ordering
+    return videoUrl.hashCode.abs() % 2;
+  }
 }

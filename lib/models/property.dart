@@ -44,6 +44,9 @@ class Property {
 
   // 'image_urls' is a text array in Supabase, which maps to List<String>
   final List<String> imageUrls;
+  
+  // 'video_urls' for virtual tour videos (up to 2 videos)
+  final List<String> videoUrls;
 
   final PropertyStatus status; // Use the enum instead of String
   final DateTime createdAt; // New: Date when the property was created
@@ -74,6 +77,7 @@ class Property {
     required this.beds,
     required this.showers,
     required this.imageUrls,
+    required this.videoUrls,
     required this.status,
     required this.createdAt, // New
     this.approvedAt, // New (nullable)
@@ -104,6 +108,7 @@ class Property {
       'beds': beds,
       'showers': showers,
       'image_urls': imageUrls,
+      'video_urls': videoUrls,
       'status': statusToString(status), // Convert enum to string
       'created_at': createdAt.toIso8601String(), // Include created_at
       'approved_at': approvedAt?.toIso8601String(), // Include approved_at if not null
@@ -125,6 +130,7 @@ class Property {
       beds: json['beds'] as int,
       showers: json['showers'] as int,
       imageUrls: List<String>.from(json['image_urls'] as List<dynamic>),
+      videoUrls: List<String>.from(json['video_urls'] as List<dynamic>? ?? []),
       status: statusFromString(json['status'] as String), // Convert string to enum
       createdAt: DateTime.parse(json['created_at'] as String),
       approvedAt: json['approved_at'] != null
@@ -155,6 +161,7 @@ class Property {
       'beds': beds,
       'showers': showers,
       'imageUrls': imageUrls,
+      'videoUrls': videoUrls,
       'status': statusToString(status),
       'createdAt': createdAt,
       'approvedAt': approvedAt,
@@ -178,6 +185,7 @@ class Property {
       beds: data['beds'] as int,
       showers: data['showers'] as int? ?? 1,
       imageUrls: List<String>.from(data['imageUrls'] as List<dynamic>? ?? []),
+      videoUrls: List<String>.from(data['videoUrls'] as List<dynamic>? ?? []),
       status: statusFromString(data['status'] as String),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       approvedAt: (data['approvedAt'] as Timestamp?)?.toDate(),
@@ -199,6 +207,7 @@ class Property {
     int? beds,
     int? showers,
     List<String>? imageUrls,
+    List<String>? videoUrls,
     PropertyStatus? status,
     DateTime? createdAt,
     DateTime? approvedAt,
@@ -223,6 +232,7 @@ class Property {
       beds: beds ?? this.beds,
       showers: showers ?? this.showers,
       imageUrls: imageUrls ?? this.imageUrls,
+      videoUrls: videoUrls ?? this.videoUrls,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       approvedAt: approvedAt ?? this.approvedAt,
