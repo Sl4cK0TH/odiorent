@@ -1,7 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
 
 // Note: This function needs to be a top-level function (not a class method)
 // to be used as a background message handler.
@@ -15,7 +15,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class PushNotificationService {
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
-  final _dbService = DatabaseService();
+  final _dbService = FirebaseDatabaseService();
 
   Future<void> init(String userId) async {
     // Request permission from the user
