@@ -11,11 +11,14 @@
 ## 2. Technology Stack
 
 - **Frontend:** Flutter
-- **Backend-as-a-Service (BaaS):** Supabase
-  - **Database:** PostgreSQL
-  - **Authentication:** Supabase Auth
-  - **Storage:** Supabase Storage
+- **Backend-as-a-Service (BaaS):** Firebase
+  - **Database:** Cloud Firestore (NoSQL)
+  - **Authentication:** Firebase Auth
+  - **Storage:** Cloudinary (Free Tier)
+  - **Push Notifications:** Firebase Cloud Messaging (FCM)
 - **Primary Language:** Dart
+
+**Note:** This project was migrated from Supabase to Firebase on December 11, 2025.
 
 ## 3. Development History & Key Decisions
 

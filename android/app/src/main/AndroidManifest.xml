@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Internet permission required for Supabase API calls -->
+    <!-- Internet permission required for Firebase and Cloudinary API calls -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Camera permission for image picker -->
     <uses-permission android:name="android.permission.CAMERA"/>

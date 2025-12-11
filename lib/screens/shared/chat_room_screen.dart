@@ -4,10 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:odiorent/models/message.dart';
 import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timeago/timeago.dart' as timeago;
-
-final supabase = Supabase.instance.client;
 
 class ChatRoomScreen extends StatefulWidget {
   final String chatId;
@@ -44,19 +41,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   String? _currentUserId;
   bool _isSending = false;
 
-  // -- Real-time Feature State --
-  RealtimeChannel? _chatChannel;
-  bool _isOtherUserOnline = false;
+  // Note: Firebase doesn't have built-in presence/typing indicators like Supabase Realtime
+  // You can implement these using Firestore fields if needed
   Timer? _lastSeenTimer;
-  bool _isOtherUserTyping = false;
-  Timer? _typingTimer;
-  // -----------------------------
 
   @override
   void initState() {
     super.initState();
     _loadCurrentUserAndSetup();
-    _messageController.addListener(_handleTyping);
     
     // Set initial message if provided (for new chats)
     if (widget.initialMessage != null) {
@@ -67,12 +59,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   @override
   void dispose() {
     _lastSeenTimer?.cancel();
-    _typingTimer?.cancel();
-    if (_chatChannel != null) {
-      _chatChannel!.untrack();
-      supabase.removeChannel(_chatChannel!);
-    }
-    _messageController.removeListener(_handleTyping);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -82,65 +68,23 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final user = _authService.getCurrentUser();
     if (user != null) {
       _currentUserId = user.uid;
-      _setupChatChannel();
+      _setupLastSeenTimer();
       setState(() {});
     }
   }
 
-  void _setupChatChannel() {
+  void _setupLastSeenTimer() {
     if (_currentUserId == null) return;
 
-    _chatChannel = supabase.channel('chat:${widget.chatId}');
+    // Mark messages as read
+    _dbService.markMessagesAsRead(widget.chatId, _currentUserId!);
 
-    _chatChannel!
-        .onPresenceSync((payload) {
-      final presenceState = _chatChannel!.presenceState();
-      final isOnline = presenceState.any((presence) =>
-          presence.presences.any((p) => p.payload['user_id'] == widget.otherUserId));
-      if (mounted) {
-        setState(() {
-          _isOtherUserOnline = isOnline;
-        });
-      }
-    }).onPresenceJoin((payload) {
-      final joins = payload.newPresences;
-      if (joins.any((p) => p.payload['user_id'] == widget.otherUserId)) {
-        if (mounted) setState(() => _isOtherUserOnline = true);
-      }
-    }).onPresenceLeave((payload) {
-      final leaves = payload.leftPresences;
-      if (leaves.any((p) => p.payload['user_id'] == widget.otherUserId)) {
-        if (mounted) setState(() => _isOtherUserOnline = false);
-      }
-    }).onBroadcast(event: 'typing', callback: (payload) {
-      if (payload['user_id'] != _currentUserId) {
-        if (mounted) setState(() => _isOtherUserTyping = true);
-        _typingTimer?.cancel();
-        _typingTimer = Timer(const Duration(seconds: 2), () {
-          if (mounted) setState(() => _isOtherUserTyping = false);
-        });
-      }
-    });
-
-    _chatChannel!.subscribe((status, [ref]) async {
-      if (status == RealtimeSubscribeStatus.subscribed) {
-        await _chatChannel!.track({'user_id': _currentUserId});
-        _dbService.markMessagesAsRead(widget.chatId, _currentUserId!);
-      }
-    });
-
+    // Update last seen periodically
     _lastSeenTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (_currentUserId != null) {
         _dbService.updateUserLastSeen(_currentUserId!);
       }
     });
-  }
-
-  void _handleTyping() {
-    _chatChannel?.sendBroadcastMessage(
-      event: 'typing',
-      payload: {'user_id': _currentUserId},
-    );
   }
 
   void _scrollToBottom() {
@@ -262,19 +206,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Widget _buildSubtitle() {
-    if (_isOtherUserTyping) {
-      return const TypingIndicator();
-    }
-    if (_isOtherUserOnline) {
-      return const Row(
-        children: [
-          Icon(Icons.circle, color: Colors.greenAccent, size: 10),
-          SizedBox(width: 4),
-          Text("Online",
-              style: TextStyle(fontSize: 12, color: Colors.white70)),
-        ],
-      );
-    }
+    // Note: Online/typing indicators removed (Supabase Realtime feature)
+    // Can be re-implemented with Firestore if needed
     return Text(
       widget.propertyName,
       style: const TextStyle(fontSize: 12, color: Colors.white70),

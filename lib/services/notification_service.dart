@@ -1,48 +1,52 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
-final supabase = Supabase.instance.client;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
 
 class NotificationService {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuthService _authService = FirebaseAuthService();
+
   /// Fetches unread notification count for the current user.
   Stream<int> getUnreadNotificationCount() {
-    final userId = supabase.auth.currentUser?.id;
+    final userId = _authService.getCurrentUser()?.uid;
     if (userId == null) {
       debugPrint("No user logged in for notifications.");
       return Stream.value(0);
     }
 
-    return supabase
-        .from('notifications')
-        .stream(primaryKey: ['id'])
-        .eq('recipient_id', userId)
-        .map(
-          (events) => events.where((event) => event['is_read'] == false).length,
-        );
+    return _firestore
+        .collection('notifications')
+        .where('recipient_id', isEqualTo: userId)
+        .where('is_read', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
   }
 
   /// Fetches all notifications for the current user.
   Stream<List<Map<String, dynamic>>> getNotifications() {
-    final userId = supabase.auth.currentUser?.id;
+    final userId = _authService.getCurrentUser()?.uid;
     if (userId == null) {
       debugPrint("No user logged in for notifications.");
       return Stream.value([]);
     }
 
-    return supabase
-        .from('notifications')
-        .stream(primaryKey: ['id'])
-        .eq('recipient_id', userId)
-        .order('created_at', ascending: false);
+    return _firestore
+        .collection('notifications')
+        .where('recipient_id', isEqualTo: userId)
+        .orderBy('created_at', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => {'id': doc.id, ...doc.data()})
+            .toList());
   }
 
   /// Marks a specific notification as read.
   Future<void> markNotificationAsRead(String notificationId) async {
     try {
-      await supabase
-          .from('notifications')
-          .update({'is_read': true})
-          .eq('id', notificationId);
+      await _firestore
+          .collection('notifications')
+          .doc(notificationId)
+          .update({'is_read': true});
     } catch (e) {
       debugPrint("Error marking notification as read: $e");
       rethrow;
@@ -51,17 +55,23 @@ class NotificationService {
 
   /// Marks all notifications for the current user as read.
   Future<void> markAllNotificationsAsRead() async {
-    final userId = supabase.auth.currentUser?.id;
+    final userId = _authService.getCurrentUser()?.uid;
     if (userId == null) {
       debugPrint("No user logged in to mark all notifications as read.");
       return;
     }
     try {
-      await supabase
-          .from('notifications')
-          .update({'is_read': true})
-          .eq('recipient_id', userId)
-          .eq('is_read', false); // Only mark unread ones
+      final unreadDocs = await _firestore
+          .collection('notifications')
+          .where('recipient_id', isEqualTo: userId)
+          .where('is_read', isEqualTo: false)
+          .get();
+
+      final batch = _firestore.batch();
+      for (var doc in unreadDocs.docs) {
+        batch.update(doc.reference, {'is_read': true});
+      }
+      await batch.commit();
     } catch (e) {
       debugPrint("Error marking all notifications as read: $e");
       rethrow;
