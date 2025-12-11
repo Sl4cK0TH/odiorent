@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:odiorent/screens/shared/login_screen.dart';
 import 'package:odiorent/screens/admin/admin_dashboard_screen.dart';
 import 'package:odiorent/screens/renter/renter_home_screen.dart';
@@ -7,14 +8,12 @@ import 'package:odiorent/screens/landlord/landlord_home_screen.dart';
 
 Future<void> main() async {
   // This line is required to ensure Flutter is initialized
-  // before you call Supabase
+  // before you call Firebase
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Supabase (same as in main.dart)
-  await Supabase.initialize(
-    url: 'https://oxxjpcjusuemhdjpyssy.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94eGpwY2p1c3VlbWhkanB5c3N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NTE2NTcsImV4cCI6MjA3NzEyNzY1N30.46FVUi8lYv3UGR4vC6gc3W1tAMm3Jv7DGmPVV21jPGQ',
+  // Initialize Firebase with platform-specific options
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
   );
 
   runApp(const AdminWebApp());
