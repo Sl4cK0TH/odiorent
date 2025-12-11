@@ -65,7 +65,7 @@ class AppUser {
           : DateTime.parse(json['last_seen'] as String),
     );
   }
-}
+
   /// --- `toFirestore` Method ---
   /// Converts an AppUser object into a Map for Firestore
   Map<String, dynamic> toFirestore() {
