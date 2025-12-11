@@ -36,6 +36,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   final _priceController = TextEditingController();
   final _roomsController = TextEditingController();
   final _bedsController = TextEditingController();
+  final _showersController = TextEditingController();
   final _descriptionController = TextEditingController();
 
   // Services
@@ -57,6 +58,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     _priceController.dispose();
     _roomsController.dispose();
     _bedsController.dispose();
+    _showersController.dispose();
     super.dispose();
   }
 
@@ -121,6 +123,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         price: double.parse(_priceController.text.trim()),
         rooms: int.parse(_roomsController.text.trim()),
         beds: int.parse(_bedsController.text.trim()),
+        showers: int.parse(_showersController.text.trim()),
         imageUrls: imageUrls,
         status: PropertyStatus.pending, // Always 'pending' on creation
         createdAt: DateTime.now().toUtc(), // Set creation date
@@ -271,6 +274,17 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                     validator: (value) => _validateNumber(
                       value,
                       emptyMessage: 'Number of beds is required',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _showersController,
+                    labelText: 'Shower Rooms',
+                    prefixIcon: Icons.shower,
+                    keyboardType: TextInputType.number,
+                    validator: (value) => _validateNumber(
+                      value,
+                      emptyMessage: 'Number of shower rooms is required',
                     ),
                   ),
                   const SizedBox(height: 24),

@@ -33,14 +33,15 @@ class _LandlordEditPropertyScreenState
   late TextEditingController _priceController;
   late TextEditingController _roomsController;
   late TextEditingController _bedsController;
+  late TextEditingController _showersController;
 
   bool _isLoading = false;
   AdminUser? _landlordProfile;
   
   // Image management
   List<String> _currentImageUrls = [];
-  List<XFile> _newImageFiles = [];
-  Set<int> _imagesToDelete = {}; // Track indices of images to delete
+  final List<XFile> _newImageFiles = [];
+  final Set<int> _imagesToDelete = {}; // Track indices of images to delete
 
   @override
   void initState() {
@@ -55,6 +56,8 @@ class _LandlordEditPropertyScreenState
         TextEditingController(text: widget.property.rooms.toString());
     _bedsController =
         TextEditingController(text: widget.property.beds.toString());
+    _showersController =
+        TextEditingController(text: widget.property.showers.toString());
     
     // Initialize with current images
     _currentImageUrls = List.from(widget.property.imageUrls);
@@ -79,6 +82,7 @@ class _LandlordEditPropertyScreenState
     _priceController.dispose();
     _roomsController.dispose();
     _bedsController.dispose();
+    _showersController.dispose();
     super.dispose();
   }
 
@@ -148,6 +152,7 @@ class _LandlordEditPropertyScreenState
         price: double.parse(_priceController.text.trim()),
         rooms: int.parse(_roomsController.text.trim()),
         beds: int.parse(_bedsController.text.trim()),
+        showers: int.parse(_showersController.text.trim()),
         imageUrls: finalImageUrls,
         status: widget.property.status,
         createdAt: widget.property.createdAt,
@@ -350,6 +355,10 @@ class _LandlordEditPropertyScreenState
                   controller: _bedsController,
                   label: 'Number of Beds',
                   keyboardType: TextInputType.number),
+              _buildTextField(
+                  controller: _showersController,
+                  label: 'Number of Shower Rooms',
+                  keyboardType: TextInputType.number),
               const SizedBox(height: 24),
               
               // --- Image Management Section ---
@@ -408,7 +417,7 @@ class _LandlordEditPropertyScreenState
                                   width: 120,
                                   height: 120,
                                   decoration: BoxDecoration(
-                                    color: Colors.red.withOpacity(0.5),
+                                    color: Colors.red.withValues(alpha: 0.5),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Center(

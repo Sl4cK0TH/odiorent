@@ -307,18 +307,23 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // --- Room/Bed Stats ---
+                  // --- Room/Bed/Shower Stats ---
                   // We re-use the same chip style from the Admin screen
                   Row(
                     children: [
+                      _buildStatChip(
+                        Icons.meeting_room_outlined,
+                        '${property.rooms} Rooms',
+                      ),
+                      const SizedBox(width: 12),
                       _buildStatChip(
                         Icons.bed_outlined,
                         '${property.beds} Beds',
                       ),
                       const SizedBox(width: 12),
                       _buildStatChip(
-                        Icons.meeting_room_outlined,
-                        '${property.rooms} Rooms',
+                        Icons.shower_outlined,
+                        '${property.showers} Showers',
                       ),
                     ],
                   ),

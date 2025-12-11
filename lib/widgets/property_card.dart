@@ -114,6 +114,24 @@ class PropertyCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+
+                // --- Property Specs (Rooms, Beds, Showers) ---
+                Row(
+                  children: [
+                    Icon(Icons.meeting_room_outlined, size: 18, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text('${property.rooms}', style: const TextStyle(fontSize: 13)),
+                    const SizedBox(width: 12),
+                    Icon(Icons.bed_outlined, size: 18, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text('${property.beds}', style: const TextStyle(fontSize: 13)),
+                    const SizedBox(width: 12),
+                    Icon(Icons.shower_outlined, size: 18, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text('${property.showers}', style: const TextStyle(fontSize: 13)),
+                  ],
+                ),
                 const SizedBox(height: 12),
 
                 // --- Status Badge ---

@@ -180,9 +180,9 @@ class LandlordPropertyDetailsScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
+                      _buildSpecIcon(Icons.meeting_room_outlined, '${property.rooms} Rooms'),
                       _buildSpecIcon(Icons.bed_outlined, '${property.beds} Beds'),
-                      // _buildSpecIcon(Icons.bathtub_outlined, '${property.rooms} Baths'), // Feature not yet available
-                      // _buildSpecIcon(Icons.square_foot_outlined, '${property.price.toInt()} sqft'), // Feature not yet available
+                      _buildSpecIcon(Icons.shower_outlined, '${property.showers} Showers'),
                     ],
                   ),
                 ],

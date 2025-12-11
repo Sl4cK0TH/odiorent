@@ -40,6 +40,7 @@ class Property {
   final double price; // 'numeric' in Postgres maps to double in Dart
   final int rooms;
   final int beds;
+  final int showers; // Number of shower rooms/bathrooms
 
   // 'image_urls' is a text array in Supabase, which maps to List<String>
   final List<String> imageUrls;
@@ -71,6 +72,7 @@ class Property {
     required this.price,
     required this.rooms,
     required this.beds,
+    required this.showers,
     required this.imageUrls,
     required this.status,
     required this.createdAt, // New
@@ -100,6 +102,7 @@ class Property {
       'price': price,
       'rooms': rooms,
       'beds': beds,
+      'showers': showers,
       'image_urls': imageUrls,
       'status': statusToString(status), // Convert enum to string
       'created_at': createdAt.toIso8601String(), // Include created_at
@@ -120,6 +123,7 @@ class Property {
       price: (json['price'] as num).toDouble(),
       rooms: json['rooms'] as int,
       beds: json['beds'] as int,
+      showers: json['showers'] as int,
       imageUrls: List<String>.from(json['image_urls'] as List<dynamic>),
       status: statusFromString(json['status'] as String), // Convert string to enum
       createdAt: DateTime.parse(json['created_at'] as String),
@@ -149,6 +153,7 @@ class Property {
       'price': price,
       'rooms': rooms,
       'beds': beds,
+      'showers': showers,
       'imageUrls': imageUrls,
       'status': statusToString(status),
       'createdAt': createdAt,
@@ -171,6 +176,7 @@ class Property {
       price: (data['price'] as num).toDouble(),
       rooms: data['rooms'] as int,
       beds: data['beds'] as int,
+      showers: data['showers'] as int? ?? 1,
       imageUrls: List<String>.from(data['imageUrls'] as List<dynamic>? ?? []),
       status: statusFromString(data['status'] as String),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -191,6 +197,7 @@ class Property {
     double? price,
     int? rooms,
     int? beds,
+    int? showers,
     List<String>? imageUrls,
     PropertyStatus? status,
     DateTime? createdAt,
@@ -214,6 +221,7 @@ class Property {
       price: price ?? this.price,
       rooms: rooms ?? this.rooms,
       beds: beds ?? this.beds,
+      showers: showers ?? this.showers,
       imageUrls: imageUrls ?? this.imageUrls,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,

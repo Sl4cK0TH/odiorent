@@ -649,21 +649,6 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
                 onTap: () => _navigateAndRefresh(const LandlordChangePasswordScreen()),
               ),
               _buildSettingsTile(
-                icon: Icons.business_outlined,
-                title: 'My Properties',
-                onTap: () => setState(() => _selectedIndex = 0),
-              ),
-              _buildSettingsTile(
-                icon: Icons.analytics_outlined,
-                title: 'Property Analytics',
-                onTap: () => _showComingSoonDialog('Property Analytics'),
-              ),
-              _buildSettingsTile(
-                icon: Icons.help_outline,
-                title: 'Help & Support',
-                onTap: () => _showComingSoonDialog('Help & Support'),
-              ),
-              _buildSettingsTile(
                 icon: Icons.logout,
                 title: 'Logout',
                 onTap: _handleLogout,

@@ -1,5 +1,31 @@
 # Changelog
 
+## [2025-12-11 - Latest Updates]
+
+### Property Model Enhancement - Showers Field
+- **Added showers/bathrooms field** to Property model and all related screens:
+  - ✅ `lib/models/property.dart`: Added `showers` field with full serialization (toJson, toFirestore, fromFirestore, fromMap, copyWith)
+  - ✅ `lib/screens/landlord/add_property_screen.dart`: Added showers input field with Icons.shower
+  - ✅ `lib/screens/landlord/landlord_edit_property_screen.dart`: Added showers field editing capability
+  - ✅ `lib/screens/landlord/landlord_property_details_screen.dart`: Display showers count with icon (Rooms, Beds, Showers)
+  - ✅ `lib/screens/renter/property_details_screen.dart`: Display showers in property stats
+  - ✅ `lib/widgets/property_card.dart`: Added compact room/bed/shower icons to property listings
+  
+### Code Quality Improvements
+- **Linting fixes**:
+  - Made `_newImageFiles` and `_imagesToDelete` final in edit screen
+  - Replaced deprecated `withOpacity()` with `withValues(alpha:)` for Flutter 3.9+ compatibility
+  - All code passes `flutter analyze` with zero issues
+
+### UI/UX Improvements - Account Settings
+- **Removed unnecessary menu items** from Landlord Account Settings:
+  - ❌ Removed "My Properties" (redundant - already accessible via home tab)
+  - ❌ Removed "Property Analytics" (coming soon feature)
+  - ❌ Removed "Help & Support" (coming soon feature)
+  - Settings now shows: Edit Profile, Change Password, Logout
+
+---
+
 ## [2025-12-11 - Firebase Migration] - Big Bang Migration Start
 
 ### Git Backup
