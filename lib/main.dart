@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:firebase_core/firebase_core.dart'; // Import Firebase Core
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:odiorent/screens/splash_screen.dart';
 import 'package:odiorent/screens/renter/renter_home_screen.dart';
 import 'package:odiorent/screens/landlord/landlord_home_screen.dart';
@@ -8,11 +9,16 @@ import 'package:odiorent/screens/admin/admin_dashboard_screen.dart';
 
 Future<void> main() async {
   // This line is required to ensure Flutter is initialized
-  // before you call Supabase or Firebase
+  // before you call Firebase
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Initialize Firebase
+  
+  // Initialize Firebase with platform-specific options
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-  // Initialize Supabase
+  // TODO: Remove Supabase initialization after testing Firebase migration
+  // Initialize Supabase (TEMPORARY - keeping for backward compatibility during migration)
   await Supabase.initialize(
     url: 'https://oxxjpcjusuemhdjpyssy.supabase.co',
     anonKey:
@@ -22,6 +28,7 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
+// TODO: Remove after migration - global Supabase client (DEPRECATED)
 // You can create a global variable to access the Supabase client
 // from anywhere in your app
 final supabase = Supabase.instance.client;
