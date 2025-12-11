@@ -1190,4 +1190,431 @@ class FirebaseDatabaseService {
     // In practice, you might want to use actual ordering
     return videoUrl.hashCode.abs() % 2;
   }
+
+  // ========== BOOKING OPERATIONS ==========
+
+  /// Create a new booking request
+  Future<String> createBooking({
+    required String propertyId,
+    required String renterId,
+    required String landlordId,
+    String? propertyName,
+    String? propertyAddress,
+    double? propertyPrice,
+    String? propertyImageUrl,
+    String? renterName,
+    String? renterEmail,
+    String? renterPhone,
+    required DateTime moveInDate,
+    required int durationMonths,
+    required int numberOfOccupants,
+    String? specialRequests,
+    required double monthlyRent,
+    required double securityDeposit,
+  }) async {
+    try {
+      // Calculate move-out date and total amount
+      final moveOutDate = DateTime(
+        moveInDate.year,
+        moveInDate.month + durationMonths,
+        moveInDate.day,
+      );
+      final totalAmount = (monthlyRent * durationMonths) + securityDeposit;
+
+      // Check for overlapping bookings
+      final existingBookings = await _firestore
+          .collection('bookings')
+          .where('propertyId', isEqualTo: propertyId)
+          .where('status', whereIn: ['approved', 'active'])
+          .get();
+
+      for (var doc in existingBookings.docs) {
+        final data = doc.data();
+        final existingMoveIn = (data['moveInDate'] as Timestamp).toDate();
+        final existingMoveOut = (data['moveOutDate'] as Timestamp).toDate();
+
+        // Check if dates overlap
+        if ((moveInDate.isBefore(existingMoveOut) && moveOutDate.isAfter(existingMoveIn)) ||
+            (moveInDate.isAtSameMomentAs(existingMoveIn) || moveOutDate.isAtSameMomentAs(existingMoveOut))) {
+          throw Exception('Property is already booked for the selected dates');
+        }
+      }
+
+      final bookingData = {
+        'propertyId': propertyId,
+        'renterId': renterId,
+        'landlordId': landlordId,
+        'propertyName': propertyName,
+        'propertyAddress': propertyAddress,
+        'propertyPrice': propertyPrice,
+        'propertyImageUrl': propertyImageUrl,
+        'renterName': renterName,
+        'renterEmail': renterEmail,
+        'renterPhone': renterPhone,
+        'moveInDate': Timestamp.fromDate(moveInDate),
+        'durationMonths': durationMonths,
+        'moveOutDate': Timestamp.fromDate(moveOutDate),
+        'numberOfOccupants': numberOfOccupants,
+        'specialRequests': specialRequests,
+        'monthlyRent': monthlyRent,
+        'securityDeposit': securityDeposit,
+        'totalAmount': totalAmount,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      final docRef = await _firestore.collection('bookings').add(bookingData);
+
+      debugPrint("✅ Booking created successfully with ID: ${docRef.id}");
+      return docRef.id;
+    } catch (e) {
+      debugPrint("❌ Error creating booking: $e");
+      rethrow;
+    }
+  }
+
+  /// Get bookings for a renter
+  Future<List<Map<String, dynamic>>> getBookingsByRenter(String renterId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('renterId', isEqualTo: renterId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        return {'id': doc.id, ...doc.data()};
+      }).toList();
+    } catch (e) {
+      debugPrint("❌ Error fetching renter bookings: $e");
+      // Fallback: manual sorting if index doesn't exist
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('renterId', isEqualTo: renterId)
+          .get();
+
+      final bookings = snapshot.docs.map((doc) {
+        return {'id': doc.id, ...doc.data()};
+      }).toList();
+
+      bookings.sort((a, b) {
+        final aTime = a['createdAt'] as Timestamp?;
+        final bTime = b['createdAt'] as Timestamp?;
+        if (aTime == null || bTime == null) return 0;
+        return bTime.compareTo(aTime);
+      });
+
+      return bookings;
+    }
+  }
+
+  /// Get bookings for a landlord
+  Future<List<Map<String, dynamic>>> getBookingsByLandlord(String landlordId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('landlordId', isEqualTo: landlordId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        return {'id': doc.id, ...doc.data()};
+      }).toList();
+    } catch (e) {
+      debugPrint("❌ Error fetching landlord bookings: $e");
+      // Fallback: manual sorting
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('landlordId', isEqualTo: landlordId)
+          .get();
+
+      final bookings = snapshot.docs.map((doc) {
+        return {'id': doc.id, ...doc.data()};
+      }).toList();
+
+      bookings.sort((a, b) {
+        final aTime = a['createdAt'] as Timestamp?;
+        final bTime = b['createdAt'] as Timestamp?;
+        if (aTime == null || bTime == null) return 0;
+        return bTime.compareTo(aTime);
+      });
+
+      return bookings;
+    }
+  }
+
+  /// Get bookings for a specific property
+  Future<List<Map<String, dynamic>>> getBookingsByProperty(String propertyId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('propertyId', isEqualTo: propertyId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        return {'id': doc.id, ...doc.data()};
+      }).toList();
+    } catch (e) {
+      debugPrint("❌ Error fetching property bookings: $e");
+      // Fallback: manual sorting
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('propertyId', isEqualTo: propertyId)
+          .get();
+
+      final bookings = snapshot.docs.map((doc) {
+        return {'id': doc.id, ...doc.data()};
+      }).toList();
+
+      bookings.sort((a, b) {
+        final aTime = a['createdAt'] as Timestamp?;
+        final bTime = b['createdAt'] as Timestamp?;
+        if (aTime == null || bTime == null) return 0;
+        return bTime.compareTo(aTime);
+      });
+
+      return bookings;
+    }
+  }
+
+  /// Get pending bookings for a landlord
+  Future<List<Map<String, dynamic>>> getPendingBookingsByLandlord(String landlordId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('landlordId', isEqualTo: landlordId)
+          .where('status', isEqualTo: 'pending')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        return {'id': doc.id, ...doc.data()};
+      }).toList();
+    } catch (e) {
+      debugPrint("❌ Error fetching pending bookings: $e");
+      // Fallback
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('landlordId', isEqualTo: landlordId)
+          .where('status', isEqualTo: 'pending')
+          .get();
+
+      final bookings = snapshot.docs.map((doc) {
+        return {'id': doc.id, ...doc.data()};
+      }).toList();
+
+      bookings.sort((a, b) {
+        final aTime = a['createdAt'] as Timestamp?;
+        final bTime = b['createdAt'] as Timestamp?;
+        if (aTime == null || bTime == null) return 0;
+        return bTime.compareTo(aTime);
+      });
+
+      return bookings;
+    }
+  }
+
+  /// Get active bookings for a property
+  Future<List<Map<String, dynamic>>> getActiveBookingsByProperty(String propertyId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('propertyId', isEqualTo: propertyId)
+          .where('status', whereIn: ['approved', 'active'])
+          .get();
+
+      return snapshot.docs.map((doc) {
+        return {'id': doc.id, ...doc.data()};
+      }).toList();
+    } catch (e) {
+      debugPrint("❌ Error fetching active bookings: $e");
+      return [];
+    }
+  }
+
+  /// Update booking status
+  Future<void> updateBookingStatus({
+    required String bookingId,
+    required String status,
+    String? rejectionReason,
+    String? cancellationReason,
+  }) async {
+    try {
+      final updateData = <String, dynamic>{
+        'status': status,
+      };
+
+      if (status == 'approved') {
+        updateData['approvedAt'] = FieldValue.serverTimestamp();
+      } else if (status == 'rejected') {
+        updateData['rejectedAt'] = FieldValue.serverTimestamp();
+        if (rejectionReason != null) {
+          updateData['rejectionReason'] = rejectionReason;
+        }
+      } else if (status == 'cancelled') {
+        updateData['cancelledAt'] = FieldValue.serverTimestamp();
+        if (cancellationReason != null) {
+          updateData['cancellationReason'] = cancellationReason;
+        }
+      }
+
+      await _firestore.collection('bookings').doc(bookingId).update(updateData);
+
+      debugPrint("✅ Booking $bookingId status updated to $status");
+    } catch (e) {
+      debugPrint("❌ Error updating booking status: $e");
+      rethrow;
+    }
+  }
+
+  /// Get a single booking by ID
+  Future<Map<String, dynamic>?> getBookingById(String bookingId) async {
+    try {
+      final doc = await _firestore.collection('bookings').doc(bookingId).get();
+      
+      if (doc.exists) {
+        return {'id': doc.id, ...doc.data()!};
+      }
+      return null;
+    } catch (e) {
+      debugPrint("❌ Error fetching booking: $e");
+      return null;
+    }
+  }
+
+  /// Stream bookings for a renter (real-time updates)
+  Stream<List<Map<String, dynamic>>> streamBookingsByRenter(String renterId) {
+    return _firestore
+        .collection('bookings')
+        .where('renterId', isEqualTo: renterId)
+        .snapshots()
+        .map((snapshot) {
+      final bookings = snapshot.docs.map((doc) {
+        return {'id': doc.id, ...doc.data()};
+      }).toList();
+
+      // Sort manually
+      bookings.sort((a, b) {
+        final aTime = a['createdAt'] as Timestamp?;
+        final bTime = b['createdAt'] as Timestamp?;
+        if (aTime == null || bTime == null) return 0;
+        return bTime.compareTo(aTime);
+      });
+
+      return bookings;
+    });
+  }
+
+  /// Stream bookings for a landlord (real-time updates)
+  Stream<List<Map<String, dynamic>>> streamBookingsByLandlord(String landlordId) {
+    return _firestore
+        .collection('bookings')
+        .where('landlordId', isEqualTo: landlordId)
+        .snapshots()
+        .map((snapshot) {
+      final bookings = snapshot.docs.map((doc) {
+        return {'id': doc.id, ...doc.data()};
+      }).toList();
+
+      // Sort manually
+      bookings.sort((a, b) {
+        final aTime = a['createdAt'] as Timestamp?;
+        final bTime = b['createdAt'] as Timestamp?;
+        if (aTime == null || bTime == null) return 0;
+        return bTime.compareTo(aTime);
+      });
+
+      return bookings;
+    });
+  }
+
+  /// Stream pending bookings count for landlord (for notification badge)
+  Stream<int> streamPendingBookingsCount(String landlordId) {
+    return _firestore
+        .collection('bookings')
+        .where('landlordId', isEqualTo: landlordId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  /// Cancel booking
+  Future<void> cancelBooking(String bookingId, String cancellationReason) async {
+    await updateBookingStatus(
+      bookingId: bookingId,
+      status: 'cancelled',
+      cancellationReason: cancellationReason,
+    );
+  }
+
+  /// Approve booking
+  Future<void> approveBooking(String bookingId) async {
+    await updateBookingStatus(
+      bookingId: bookingId,
+      status: 'approved',
+    );
+  }
+
+  /// Reject booking
+  Future<void> rejectBooking(String bookingId, String rejectionReason) async {
+    await updateBookingStatus(
+      bookingId: bookingId,
+      status: 'rejected',
+      rejectionReason: rejectionReason,
+    );
+  }
+
+  /// Mark booking as active (when move-in date arrives)
+  Future<void> activateBooking(String bookingId) async {
+    await updateBookingStatus(
+      bookingId: bookingId,
+      status: 'active',
+    );
+  }
+
+  /// Mark booking as completed (when move-out date arrives)
+  Future<void> completeBooking(String bookingId) async {
+    await updateBookingStatus(
+      bookingId: bookingId,
+      status: 'completed',
+    );
+  }
+
+  /// Check if property is available for the given date range
+  Future<bool> isPropertyAvailable({
+    required String propertyId,
+    required DateTime moveInDate,
+    required DateTime moveOutDate,
+    String? excludeBookingId, // For when editing a booking
+  }) async {
+    try {
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('propertyId', isEqualTo: propertyId)
+          .where('status', whereIn: ['approved', 'active'])
+          .get();
+
+      for (var doc in snapshot.docs) {
+        if (excludeBookingId != null && doc.id == excludeBookingId) {
+          continue; // Skip the booking being edited
+        }
+
+        final data = doc.data();
+        final existingMoveIn = (data['moveInDate'] as Timestamp).toDate();
+        final existingMoveOut = (data['moveOutDate'] as Timestamp).toDate();
+
+        // Check if dates overlap
+        if ((moveInDate.isBefore(existingMoveOut) && moveOutDate.isAfter(existingMoveIn)) ||
+            (moveInDate.isAtSameMomentAs(existingMoveIn) || moveOutDate.isAtSameMomentAs(existingMoveOut))) {
+          return false; // Property is not available
+        }
+      }
+
+      return true; // Property is available
+    } catch (e) {
+      debugPrint("❌ Error checking property availability: $e");
+      return false;
+    }
+  }
 }

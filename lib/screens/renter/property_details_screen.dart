@@ -4,6 +4,7 @@ import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:odiorent/screens/shared/chat_room_screen.dart';
+import 'package:odiorent/screens/renter/create_booking_screen.dart';
 import 'package:odiorent/widgets/video_player_widget.dart';
 
 class PropertyDetailsScreen extends StatefulWidget {
@@ -110,12 +111,35 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
     }
   }
 
-  void _handleBookNow() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Booking flow coming soon!'),
+  void _handleBookNow() async {
+    // Check if property status is approved
+    if (_property.status != PropertyStatus.approved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This property is not available for booking at this time'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Navigate to booking screen
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateBookingScreen(property: _property),
       ),
     );
+
+    // If booking was successful, show confirmation
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Booking request sent! The landlord will review your request.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   /// --- Day 6: Message Landlord ---
