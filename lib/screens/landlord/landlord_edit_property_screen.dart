@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:odiorent/models/property.dart';
-import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:odiorent/models/admin_user.dart';
-import 'package:odiorent/services/auth_service.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
 
 class LandlordEditPropertyScreen extends StatefulWidget {
   final Property property;
@@ -18,8 +18,8 @@ class LandlordEditPropertyScreen extends StatefulWidget {
 class _LandlordEditPropertyScreenState
     extends State<LandlordEditPropertyScreen> {
   final _formKey = GlobalKey<FormState>();
-  final DatabaseService _dbService = DatabaseService();
-  final AuthService _authService = AuthService();
+  final FirebaseDatabaseService _dbService = FirebaseDatabaseService();
+  final FirebaseAuthService _authService = FirebaseAuthService();
 
   late TextEditingController _nameController;
   late TextEditingController _addressController;

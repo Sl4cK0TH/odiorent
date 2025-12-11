@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:odiorent/models/property_with_landlord.dart';
-import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:odiorent/screens/renter/booking/booking_screen.dart';
 
@@ -16,7 +16,7 @@ class RenterPropertyDetailsScreen extends StatefulWidget {
 
 class _RenterPropertyDetailsScreenState
     extends State<RenterPropertyDetailsScreen> {
-  final DatabaseService _dbService = DatabaseService();
+  final FirebaseDatabaseService _dbService = FirebaseDatabaseService();
   Future<PropertyWithLandlord>? _propertyFuture;
 
   @override

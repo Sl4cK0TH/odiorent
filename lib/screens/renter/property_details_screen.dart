@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:odiorent/models/property.dart';
-import 'package:odiorent/services/auth_service.dart';
-import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:odiorent/screens/shared/chat_room_screen.dart';
 
 class PropertyDetailsScreen extends StatefulWidget {
@@ -18,8 +18,8 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
   static const Color lightGreen = Color(0xFF66BB6A);
   static const Color darkGreen = Color(0xFF388E3C);
 
-  final DatabaseService _dbService = DatabaseService();
-  final AuthService _authService = AuthService();
+  final FirebaseDatabaseService _dbService = FirebaseDatabaseService();
+  final FirebaseAuthService _authService = FirebaseAuthService();
 
   late Property _property;
   bool _isMessageLoading = false;

@@ -3,7 +3,7 @@ import 'package:intl/intl.dart'; // For currency formatting
 import 'package:fluttertoast/fluttertoast.dart'; // Import for Fluttertoast
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/screens/landlord/landlord_edit_property_screen.dart'; // For navigation
-import 'package:odiorent/services/database_service.dart'; // Import for DatabaseService
+import 'package:odiorent/services/firebase_database_service.dart'; // Import for FirebaseDatabaseService
 
 class LandlordPropertyDetailsScreen extends StatelessWidget {
   final Property property;
@@ -58,7 +58,7 @@ class LandlordPropertyDetailsScreen extends StatelessWidget {
 
               if (confirmDelete == true) {
                 try {
-                  await DatabaseService().deleteProperty(property.id!);
+                  await FirebaseDatabaseService().deleteProperty(property.id!);
                   if (context.mounted) {
                     Fluttertoast.showToast(
                       msg: "Property deleted successfully!",

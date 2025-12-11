@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart'; // Import the package
 import 'package:odiorent/models/property.dart';
-import 'package:odiorent/services/auth_service.dart';
-import 'package:odiorent/services/database_service.dart';
-import 'package:odiorent/services/storage_service.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
+import 'package:odiorent/services/cloudinary_service.dart';
 import 'package:odiorent/widgets/custom_button.dart';
 import 'package:path/path.dart' as p; // Import path package with prefix
 
@@ -39,9 +39,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   final _descriptionController = TextEditingController();
 
   // Services
-  final _dbService = DatabaseService();
-  final _storageService = StorageService();
-  final _authService = AuthService();
+  final _dbService = FirebaseDatabaseService();
+  final _storageService = CloudinaryService();
+  final _authService = FirebaseAuthService();
 
   // State variables
   bool _isLoading = false;

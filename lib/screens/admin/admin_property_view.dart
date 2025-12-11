@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:odiorent/models/property.dart';
-import 'package:odiorent/services/database_service.dart';
+import 'package:odiorent/services/firebase_database_service.dart';
 
 class AdminPropertyViewScreen extends StatefulWidget {
   final Property property;
@@ -16,7 +16,7 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
   static const Color lightGreen = Color(0xFF66BB6A);
   static const Color darkGreen = Color(0xFF388E3C);
 
-  final DatabaseService _dbService = DatabaseService();
+  final FirebaseDatabaseService _dbService = FirebaseDatabaseService();
   bool _isLoading = false;
 
   Future<void> _handleUpdateStatus(PropertyStatus newStatus) async {
