@@ -124,7 +124,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Booking Details'),
-        backgroundColor: const Color(0xFFFF6B6B),
+        backgroundColor: const Color(0xFF4CAF50),
         foregroundColor: Colors.white,
       ),
       body: FutureBuilder<Map<String, dynamic>?>(
@@ -257,6 +257,10 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                     _buildInfoRow(
                       'Security Deposit',
                       '₱${NumberFormat('#,##0.00').format((bookingData['securityDeposit'] as num?)?.toDouble() ?? 0)}',
+                    ),
+                    _buildInfoRow(
+                      'Payment Method',
+                      'Over the Counter',
                     ),
                     const Divider(thickness: 2),
                     _buildInfoRow(
@@ -412,7 +416,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
               style: TextStyle(
                 fontSize: isTotal ? 18 : 14,
                 fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-                color: isTotal ? const Color(0xFFFF6B6B) : Colors.black,
+                color: isTotal ? const Color(0xFF4CAF50) : Colors.black,
               ),
               textAlign: TextAlign.right,
             ),

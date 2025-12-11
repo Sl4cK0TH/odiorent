@@ -18,9 +18,23 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
   final _dbService = FirebaseDatabaseService();
   final _authService = FirebaseAuthService();
 
+  @override
+  void initState() {
+    super.initState();
+    _initializeRenterName();
+  }
+
+  Future<void> _initializeRenterName() async {
+    final currentUser = _authService.currentUser;
+    if (currentUser != null) {
+      _renterNameController.text = currentUser.displayName ?? 'Renter';
+    }
+  }
+
   DateTime? _selectedMoveInDate;
   int _durationMonths = 12; // Default 1 year
-  int _numberOfOccupants = 1;
+  final _numberOfOccupantsController = TextEditingController(text: '1');
+  final _renterNameController = TextEditingController();
   final _specialRequestsController = TextEditingController();
 
   bool _isLoading = false;
@@ -33,6 +47,8 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
 
   @override
   void dispose() {
+    _numberOfOccupantsController.dispose();
+    _renterNameController.dispose();
     _specialRequestsController.dispose();
     super.dispose();
   }
@@ -47,7 +63,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFFFF6B6B),
+              primary: Color(0xFF4CAF50),
             ),
           ),
           child: child!,
@@ -133,6 +149,8 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
         throw Exception('Property is not available for the selected dates');
       }
 
+      final numberOfOccupants = int.parse(_numberOfOccupantsController.text);
+      
       await _dbService.createBooking(
         propertyId: widget.property.id!,
         renterId: currentUser.uid,
@@ -143,12 +161,12 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
         propertyImageUrl: widget.property.imageUrls.isNotEmpty 
             ? widget.property.imageUrls[0] 
             : null,
-        renterName: currentUser.displayName,
+        renterName: _renterNameController.text.trim(),
         renterEmail: currentUser.email,
         renterPhone: currentUser.phoneNumber,
         moveInDate: _selectedMoveInDate!,
         durationMonths: _durationMonths,
-        numberOfOccupants: _numberOfOccupants,
+        numberOfOccupants: numberOfOccupants,
         specialRequests: _specialRequestsController.text.trim().isNotEmpty
             ? _specialRequestsController.text.trim()
             : null,
@@ -196,7 +214,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Book Property'),
-        backgroundColor: const Color(0xFFFF6B6B),
+        backgroundColor: const Color(0xFF4CAF50),
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -249,7 +267,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFFFF6B6B),
+                          color: Color(0xFF4CAF50),
                         ),
                       ),
                     ],
@@ -313,7 +331,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
                   ),
                 ),
                 items: [
-                  3, 6, 9, 12, 18, 24, 36
+                  1, 2, 3, 6, 9, 12, 18, 24, 36
                 ].map((months) {
                   final years = months ~/ 12;
                   final remainingMonths = months % 12;
@@ -351,25 +369,49 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
               const SizedBox(height: 16),
 
               // Number of Occupants
-              DropdownButtonFormField<int>(
-                initialValue: _numberOfOccupants,
+              TextFormField(
+                controller: _numberOfOccupantsController,
+                keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: 'Number of Occupants',
+                  hintText: 'Enter number of people',
                   prefixIcon: const Icon(Icons.people),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                items: List.generate(10, (index) => index + 1)
-                    .map((count) => DropdownMenuItem(
-                          value: count,
-                          child: Text('$count ${count == 1 ? 'person' : 'people'}'),
-                        ))
-                    .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _numberOfOccupants = value!;
-                  });
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter number of occupants';
+                  }
+                  final number = int.tryParse(value);
+                  if (number == null || number < 1) {
+                    return 'Please enter a valid number (minimum 1)';
+                  }
+                  if (number > 50) {
+                    return 'Number of occupants cannot exceed 50';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Renter Name (Editable)
+              TextFormField(
+                controller: _renterNameController,
+                decoration: InputDecoration(
+                  labelText: 'Your Name',
+                  hintText: 'Enter your full name',
+                  prefixIcon: const Icon(Icons.person),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter your name';
+                  }
+                  return null;
                 },
               ),
               const SizedBox(height: 16),
@@ -426,6 +468,11 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
                         'Security Deposit (2 months)',
                         '₱${NumberFormat('#,##0.00').format(_securityDeposit)}',
                       ),
+                      const Divider(),
+                      _buildSummaryRow(
+                        'Payment Method',
+                        'Over the Counter',
+                      ),
                       const Divider(thickness: 2),
                       _buildSummaryRow(
                         'Total Amount',
@@ -447,7 +494,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
                       ? null
                       : _submitBooking,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B6B),
+                    backgroundColor: const Color(0xFF4CAF50),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),

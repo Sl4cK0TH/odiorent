@@ -461,7 +461,7 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
               activeIcon: Icons.bookmark,
               index: 1,
             ),
-            _buildNavItem(
+            _buildNavItemWithBadge(
               icon: Icons.calendar_month_outlined,
               activeIcon: Icons.calendar_month,
               index: 2,
@@ -507,6 +507,70 @@ class _RenterHomeScreenState extends State<RenterHomeScreen> {
               size: 24,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItemWithBadge({
+    required IconData icon,
+    required IconData activeIcon,
+    required int index,
+  }) {
+    final isSelected = _selectedIndex == index;
+    final user = _authService.getCurrentUser();
+    
+    return Expanded(
+      child: InkWell(
+        onTap: () => _onItemTapped(index),
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: StreamBuilder<List<Map<String, dynamic>>>(          stream: user != null ? _dbService.streamBookingsByRenter(user.uid) : null,
+          builder: (context, snapshot) {
+            final bookings = snapshot.data ?? [];
+            final pendingCount = bookings.where((b) => b['status'] == 'pending').length;
+            
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isSelected ? activeIcon : icon,
+                      color: isSelected ? primaryGreen : Colors.grey[600],
+                      size: 24,
+                    ),
+                  ],
+                ),
+                if (pendingCount > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        pendingCount > 9 ? '9+' : pendingCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );

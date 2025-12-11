@@ -181,8 +181,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
             _buildHomeTab(), // 0
             const LandlordBookingsScreen(), // 1
             _buildMessagesTab(), // 2
-            _buildNotificationsTab(), // 3
-            _buildAccountTab(), // 4
+            _buildAccountTab(), // 3
           ],
         ),
         bottomNavigationBar: Padding(
@@ -221,6 +220,56 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
                 fontSize: 24,
               ),
             ),
+            actions: [
+              // Notifications button with badge
+              StreamBuilder<int>(
+                stream: _dbService.streamPendingBookingsCount(_currentUserId ?? ''),
+                builder: (context, snapshot) {
+                  final count = snapshot.data ?? 0;
+                  return Stack(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.notifications, color: Colors.white),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const NotificationsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      if (count > 0)
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: Text(
+                              count > 99 ? '99+' : count.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
           ),
           SliverToBoxAdapter(
             child: Padding(
@@ -497,10 +546,6 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   }
 
 
-  Widget _buildNotificationsTab() {
-    return const NotificationsScreen();
-  }
-
   Widget _buildBottomNavigationBar() {
     return Container(
       decoration: BoxDecoration(
@@ -521,14 +566,14 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildNavItem(icon: Icons.home_outlined, activeIcon: Icons.home, index: 0),
-            _buildNavItem(icon: Icons.calendar_month_outlined, activeIcon: Icons.calendar_month, index: 1),
+            _buildNavItemWithBadge(
+              icon: Icons.calendar_month_outlined,
+              activeIcon: Icons.calendar_month,
+              index: 1,
+            ),
             _buildNavItem(icon: Icons.message_outlined, activeIcon: Icons.message, index: 2),
             const SizedBox(width: 40), // The gap for the FAB
-            _buildNavItem(
-                icon: Icons.notifications_outlined,
-                activeIcon: Icons.notifications,
-                index: 3),
-            _buildNavItem(icon: Icons.person_outline, activeIcon: Icons.person, index: 4),
+            _buildNavItem(icon: Icons.person_outline, activeIcon: Icons.person, index: 3),
           ],
         ),
       ),
@@ -555,6 +600,67 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
               size: 28,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItemWithBadge({
+    required IconData icon,
+    required IconData activeIcon,
+    required int index,
+  }) {
+    final isSelected = _selectedIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => _onItemTapped(index),
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: StreamBuilder<int>(
+          stream: _dbService.streamPendingBookingsCount(_currentUserId ?? ''),
+          builder: (context, snapshot) {
+            final count = snapshot.data ?? 0;
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isSelected ? activeIcon : icon,
+                      color: isSelected ? primaryGreen : Colors.grey[600],
+                      size: 28,
+                    ),
+                  ],
+                ),
+                if (count > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        count > 9 ? '9+' : count.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );

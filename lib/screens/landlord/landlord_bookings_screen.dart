@@ -30,7 +30,7 @@ class _LandlordBookingsScreenState extends State<LandlordBookingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Booking Requests'),
-        backgroundColor: const Color(0xFFFF6B6B),
+        backgroundColor: const Color(0xFF4CAF50),
         foregroundColor: Colors.white,
       ),
       body: Column(
@@ -176,13 +176,13 @@ class _LandlordBookingsScreenState extends State<LandlordBookingsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: isSelected ? Colors.white : const Color(0xFFFF6B6B),
+                        color: isSelected ? Colors.white : const Color(0xFF4CAF50),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         count.toString(),
                         style: TextStyle(
-                          color: isSelected ? const Color(0xFFFF6B6B) : Colors.white,
+                          color: isSelected ? const Color(0xFF4CAF50) : Colors.white,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -198,7 +198,7 @@ class _LandlordBookingsScreenState extends State<LandlordBookingsScreen> {
                 });
               },
               backgroundColor: Colors.grey[200],
-              selectedColor: const Color(0xFFFF6B6B),
+              selectedColor: const Color(0xFF4CAF50),
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : Colors.black,
               ),
@@ -357,11 +357,11 @@ class _LandlordBookingsScreenState extends State<LandlordBookingsScreen> {
                         const SizedBox(height: 4),
                         Text(
                           '₱${NumberFormat('#,##0.00').format(monthlyRent)}/month',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFFF6B6B),
-                          ),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF4CAF50),
+                        ),
                         ),
                       ],
                     ),

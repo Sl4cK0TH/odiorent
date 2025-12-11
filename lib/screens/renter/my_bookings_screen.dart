@@ -30,7 +30,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Bookings'),
-        backgroundColor: const Color(0xFFFF6B6B),
+        backgroundColor: const Color(0xFF4CAF50),
         foregroundColor: Colors.white,
       ),
       body: Column(
@@ -128,7 +128,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         });
       },
       backgroundColor: Colors.grey[200],
-      selectedColor: const Color(0xFFFF6B6B),
+      selectedColor: const Color(0xFF4CAF50),
       labelStyle: TextStyle(
         color: isSelected ? Colors.white : Colors.black,
       ),
@@ -248,7 +248,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFFFF6B6B),
+                        color: Color(0xFF4CAF50),
                       ),
                     ),
                     const SizedBox(height: 8),
