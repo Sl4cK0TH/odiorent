@@ -1,6 +1,39 @@
 # Changelog
 
-## [2025-12-11 - Latest Updates]
+## [2025-12-12 - Latest Updates]
+
+### UI/UX Improvements
+- **Renter Navigation**:
+  - ✅ Moved notifications to appbar top-right (matching landlord layout)
+  - ✅ Removed notifications from bottom navigation bar
+  - ✅ Centered Bookings button in bottom navigation (5 items: Home, Bookmarks, Bookings, Messages, Account)
+  - ✅ Fixed badge positioning on Bookings icon
+  - ✅ Changed navigation alignment from spaceAround to spaceEvenly
+
+- **Landlord Navigation**:
+  - ✅ Fixed button placement in bottom navigation bar
+  - ✅ Changed alignment from spaceAround to spaceEvenly for better distribution
+  - ✅ Increased FAB gap from 40px to 48px for better visual balance
+  - ✅ Fixed badge positioning on Bookings icon (centered on icon)
+
+- **Landlord Messages Screen**:
+  - ✅ Added SliverAppBar with "Messages" title (matching renter's screen)
+  - ✅ Converted to CustomScrollView layout with consistent styling
+  - ✅ White text on light green background (24px bold font)
+  - ✅ Maintained refresh functionality and all states (loading, error, empty, with data)
+
+- **Video Player Enhancement**:
+  - ✅ Fixed portrait video display issues (no more pixelation)
+  - ✅ Added proper aspect ratio handling for both portrait and landscape videos
+  - ✅ Videos now center with black letterboxing/pillarboxing as needed
+  - ✅ Improved VideoPlayerWidget with Container and Center wrapping
+
+### Documentation Updates
+- **README.md**: Updated with Firebase configuration, booking system features, and Cloudinary setup
+- **INSTALLATION.md**: Complete Firebase and Cloudinary setup instructions
+- **SUMMARY.md**: Comprehensive project history, module breakdown, and current state
+
+## [2025-12-11 - Previous Updates]
 
 ### Booking System - COMPLETE ✅
 - **Fully implemented comprehensive booking request/approval system**:

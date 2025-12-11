@@ -420,36 +420,91 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
       future: _dbService.getUserChats(_currentUserId!),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: primaryGreen));
+          return CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                automaticallyImplyLeading: false,
+                pinned: true,
+                backgroundColor: lightGreen,
+                title: const Text(
+                  'Messages',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
+                  ),
+                ),
+              ),
+              const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator(color: primaryGreen)),
+              ),
+            ],
+          );
         }
 
         if (snapshot.hasError) {
-          return Center(
-            child: Text('Error loading chats: ${snapshot.error}'),
+          return CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                automaticallyImplyLeading: false,
+                pinned: true,
+                backgroundColor: lightGreen,
+                title: const Text(
+                  'Messages',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
+                  ),
+                ),
+              ),
+              SliverFillRemaining(
+                child: Center(
+                  child: Text('Error loading chats: ${snapshot.error}'),
+                ),
+              ),
+            ],
           );
         }
 
         final chatsData = snapshot.data ?? [];
         if (chatsData.isEmpty) {
-          return SafeArea(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.message_outlined, size: 80, color: Colors.grey[300]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No messages yet',
-                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+          return CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                automaticallyImplyLeading: false,
+                pinned: true,
+                backgroundColor: lightGreen,
+                title: const Text(
+                  'Messages',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Messages from renters will appear here',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  ),
-                ],
+                ),
               ),
-            ),
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.message_outlined, size: 80, color: Colors.grey[300]),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No messages yet',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Messages from renters will appear here',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           );
         }
 
@@ -457,20 +512,36 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
           return Chat.fromMap(data, _currentUserId!);
         }).toList();
 
-        return SafeArea(
-          child: RefreshIndicator(
-            onRefresh: () async {
-              setState(() {}); // Trigger rebuild
-            },
-            color: primaryGreen,
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: chats.length,
-              itemBuilder: (context, index) {
-                final chat = chats[index];
-                return _buildChatTile(chat);
-              },
-            ),
+        return RefreshIndicator(
+          onRefresh: () async {
+            setState(() {}); // Trigger rebuild
+          },
+          color: primaryGreen,
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                automaticallyImplyLeading: false,
+                pinned: true,
+                backgroundColor: lightGreen,
+                title: const Text(
+                  'Messages',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
+                  ),
+                ),
+              ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final chat = chats[index];
+                    return _buildChatTile(chat);
+                  },
+                  childCount: chats.length,
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -563,7 +634,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildNavItem(icon: Icons.home_outlined, activeIcon: Icons.home, index: 0),
             _buildNavItemWithBadge(
@@ -571,8 +642,8 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
               activeIcon: Icons.calendar_month,
               index: 1,
             ),
+            const SizedBox(width: 48), // The gap for the FAB
             _buildNavItem(icon: Icons.message_outlined, activeIcon: Icons.message, index: 2),
-            const SizedBox(width: 40), // The gap for the FAB
             _buildNavItem(icon: Icons.person_outline, activeIcon: Icons.person, index: 3),
           ],
         ),
@@ -620,44 +691,44 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
           stream: _dbService.streamPendingBookingsCount(_currentUserId ?? ''),
           builder: (context, snapshot) {
             final count = snapshot.data ?? 0;
-            return Stack(
-              clipBehavior: Clip.none,
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Stack(
+                  clipBehavior: Clip.none,
                   children: [
                     Icon(
                       isSelected ? activeIcon : icon,
                       color: isSelected ? primaryGreen : Colors.grey[600],
                       size: 28,
                     ),
+                    if (count > 0)
+                      Positioned(
+                        right: -5,
+                        top: -5,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            count > 9 ? '9+' : count.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-                if (count > 0)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                      child: Text(
-                        count > 9 ? '9+' : count.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
               ],
             );
           },

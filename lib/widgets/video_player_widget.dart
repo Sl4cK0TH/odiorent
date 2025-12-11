@@ -124,10 +124,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     }
 
     return Stack(
+      alignment: Alignment.center,
       children: [
-        AspectRatio(
-          aspectRatio: _videoPlayerController.value.aspectRatio,
-          child: Chewie(controller: _chewieController!),
+        Container(
+          color: Colors.black,
+          child: Center(
+            child: AspectRatio(
+              aspectRatio: _videoPlayerController.value.aspectRatio,
+              child: Chewie(controller: _chewieController!),
+            ),
+          ),
         ),
         if (widget.showLikeButton && _currentUserId != null)
           Positioned(
