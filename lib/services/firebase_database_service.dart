@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:odiorent/models/message.dart';
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/cloudinary_service.dart';
@@ -389,18 +390,20 @@ class FirebaseDatabaseService {
 
       await _firestore.collection('properties').doc(propertyId).update(updateData);
 
-      // Create notification for landlord
-      final notificationBody =
-          'Your property "$propertyName" has been ${statusString == 'approved' ? 'Approved' : 'Rejected'}.';
+      // Create notification for landlord using new format
+      final notificationTitle = statusString == 'approved' ? 'Property Approved' : 'Property Rejected';
+      final notificationBody = 'Your property "$propertyName" has been ${statusString == 'approved' ? 'approved' : 'rejected'}';
 
-      await _firestore.collection('notifications').add({
-        'recipientId': landlordId,
-        'title': 'Property Status Update',
-        'body': notificationBody,
-        'link': '/landlord/property/$propertyId',
-        'isRead': false,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      await createNotification(
+        recipientId: landlordId,
+        title: notificationTitle,
+        body: notificationBody,
+        type: status == PropertyStatus.approved ? 'property_approval' : 'property_rejection',
+        data: {
+          'propertyId': propertyId,
+          'status': statusString,
+        },
+      );
 
       debugPrint("✅ Property $propertyId status updated to: $statusString");
     } catch (e) {
@@ -984,6 +987,30 @@ class FirebaseDatabaseService {
     }
   }
 
+  /// --- CREATE NOTIFICATION ---
+  Future<void> createNotification({
+    required String recipientId,
+    required String title,
+    required String body,
+    required String type, // 'booking', 'property_approval', 'property_rejection', 'booking_cancellation'
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'recipient_id': recipientId,
+        'title': title,
+        'body': body,
+        'type': type,
+        'data': data ?? {},
+        'is_read': false,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      debugPrint("✅ Notification created for user: $recipientId");
+    } catch (e) {
+      debugPrint("❌ Error creating notification: $e");
+    }
+  }
+
   // ========== BOOKMARKS OPERATIONS ==========
 
   /// --- ADD BOOKMARK ---
@@ -1093,6 +1120,50 @@ class FirebaseDatabaseService {
       debugPrint("❌ Error getting user bookmarks: $e");
       return [];
     }
+  }
+
+  /// --- GET USER BOOKMARKS STREAM (Real-time) ---
+  Stream<List<Property>> getUserBookmarksStream(String userId) {
+    return _firestore
+        .collection('bookmarks')
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      try {
+        final properties = await Future.wait(
+          snapshot.docs.map((doc) async {
+            final data = doc.data();
+            final propertyId = data['propertyId'] as String?;
+            
+            if (propertyId == null) {
+              return null;
+            }
+
+            final propertyDoc = await _firestore
+                .collection('properties')
+                .doc(propertyId)
+                .get();
+
+            if (!propertyDoc.exists) {
+              return null;
+            }
+
+            final property = Property.fromFirestore(propertyDoc);
+            return await _enrichPropertyWithLandlordDetails(property);
+          }).toList(),
+        );
+
+        // Filter out nulls and sort manually
+        final validProperties = properties.whereType<Property>().toList();
+        validProperties.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+        debugPrint("✅ Streamed ${validProperties.length} bookmarked properties");
+        return validProperties;
+      } catch (e) {
+        debugPrint("❌ Error in bookmarks stream: $e");
+        return <Property>[];
+      }
+    });
   }
 
   /// --- GET BOOKMARK STREAM (Real-time) ---
@@ -1261,24 +1332,20 @@ class FirebaseDatabaseService {
       );
       final totalAmount = (monthlyRent * durationMonths) + securityDeposit;
 
-      // Check for overlapping bookings
+      // Check if property has reached maximum bookings (5 for testing)
+      const maxBookings = 5;
       final existingBookings = await _firestore
           .collection('bookings')
           .where('propertyId', isEqualTo: propertyId)
           .where('status', whereIn: ['approved', 'active'])
           .get();
 
-      for (var doc in existingBookings.docs) {
-        final data = doc.data();
-        final existingMoveIn = (data['moveInDate'] as Timestamp).toDate();
-        final existingMoveOut = (data['moveOutDate'] as Timestamp).toDate();
-
-        // Check if dates overlap
-        if ((moveInDate.isBefore(existingMoveOut) && moveOutDate.isAfter(existingMoveIn)) ||
-            (moveInDate.isAtSameMomentAs(existingMoveIn) || moveOutDate.isAtSameMomentAs(existingMoveOut))) {
-          throw Exception('Property is already booked for the selected dates');
-        }
+      if (existingBookings.docs.length >= maxBookings) {
+        debugPrint("❌ Booking blocked: Property has reached maximum bookings ($maxBookings)");
+        throw Exception('Property has reached maximum bookings ($maxBookings). Please contact the landlord.');
       }
+      
+      debugPrint("✅ Property available: ${existingBookings.docs.length}/$maxBookings bookings");
 
       final bookingData = {
         'propertyId': propertyId,
@@ -1307,13 +1374,26 @@ class FirebaseDatabaseService {
 
       debugPrint("✅ Booking created successfully with ID: ${docRef.id}");
       
-      // Send notification to landlord about new booking request
+      // Send push notification to landlord about new booking request
       await PushNotificationService().sendBookingNotification(
         userId: landlordId,
         title: 'New Booking Request 📋',
         body: '${renterName ?? "A renter"} has requested to book ${propertyName ?? "your property"}.',
         bookingId: docRef.id,
         status: 'pending',
+      );
+      
+      // Create in-app notification for landlord
+      await createNotification(
+        recipientId: landlordId,
+        title: 'New Booking Request',
+        body: '${renterName ?? "A renter"} has requested to book ${propertyName ?? "your property"}',
+        type: 'booking',
+        data: {
+          'bookingId': docRef.id,
+          'propertyId': propertyId,
+          'status': 'pending',
+        },
       );
       
       return docRef.id;
@@ -1567,6 +1647,7 @@ class FirebaseDatabaseService {
       }
       
       if (notificationTitle.isNotEmpty) {
+        // Send push notification to renter
         await PushNotificationService().sendBookingNotification(
           userId: renterId,
           title: notificationTitle,
@@ -1574,6 +1655,51 @@ class FirebaseDatabaseService {
           bookingId: bookingId,
           status: status,
         );
+        
+        // Create in-app notification for renter
+        await createNotification(
+          recipientId: renterId,
+          title: notificationTitle,
+          body: notificationBody,
+          type: 'booking_status',
+          data: {
+            'bookingId': bookingId,
+            'propertyId': propertyId,
+            'status': status,
+          },
+        );
+        
+        // If approved, also notify the landlord
+        if (status == 'approved') {
+          final landlordId = bookingData['landlordId'] as String;
+          await createNotification(
+            recipientId: landlordId,
+            title: 'Booking Approved',
+            body: 'You approved the booking request for $propertyName',
+            type: 'booking_approval',
+            data: {
+              'bookingId': bookingId,
+              'propertyId': propertyId,
+              'status': status,
+            },
+          );
+        }
+        
+        // If cancelled, notify the landlord
+        if (status == 'cancelled') {
+          final landlordId = bookingData['landlordId'] as String;
+          await createNotification(
+            recipientId: landlordId,
+            title: 'Booking Cancelled',
+            body: 'A booking for $propertyName has been cancelled',
+            type: 'booking_cancellation',
+            data: {
+              'bookingId': bookingId,
+              'propertyId': propertyId,
+              'status': status,
+            },
+          );
+        }
       }
     } catch (e) {
       debugPrint("❌ Error updating booking status: $e");
@@ -1702,28 +1828,32 @@ class FirebaseDatabaseService {
     String? excludeBookingId, // For when editing a booking
   }) async {
     try {
+      const maxBookings = 5; // Maximum concurrent bookings allowed (for testing)
+      
+      debugPrint("🔍 Checking availability for property $propertyId");
+      debugPrint("   Requested: ${DateFormat('MMM dd, yyyy').format(moveInDate)} to ${DateFormat('MMM dd, yyyy').format(moveOutDate)}");
+      
       final snapshot = await _firestore
           .collection('bookings')
           .where('propertyId', isEqualTo: propertyId)
           .where('status', whereIn: ['approved', 'active'])
           .get();
 
-      for (var doc in snapshot.docs) {
-        if (excludeBookingId != null && doc.id == excludeBookingId) {
-          continue; // Skip the booking being edited
-        }
-
-        final data = doc.data();
-        final existingMoveIn = (data['moveInDate'] as Timestamp).toDate();
-        final existingMoveOut = (data['moveOutDate'] as Timestamp).toDate();
-
-        // Check if dates overlap
-        if ((moveInDate.isBefore(existingMoveOut) && moveOutDate.isAfter(existingMoveIn)) ||
-            (moveInDate.isAtSameMomentAs(existingMoveIn) || moveOutDate.isAtSameMomentAs(existingMoveOut))) {
-          return false; // Property is not available
-        }
+      var bookingCount = snapshot.docs.length;
+      
+      // Exclude the booking being edited from the count
+      if (excludeBookingId != null) {
+        bookingCount = snapshot.docs.where((doc) => doc.id != excludeBookingId).length;
       }
 
+      debugPrint("   Found $bookingCount approved/active bookings for this property (max: $maxBookings)");
+
+      if (bookingCount >= maxBookings) {
+        debugPrint("   ❌ BLOCKED - Maximum bookings ($maxBookings) reached!");
+        return false; // Property is not available
+      }
+
+      debugPrint("   ✅ Property is AVAILABLE (${maxBookings - bookingCount} slots remaining)");
       return true; // Property is available
     } catch (e) {
       debugPrint("❌ Error checking property availability: $e");

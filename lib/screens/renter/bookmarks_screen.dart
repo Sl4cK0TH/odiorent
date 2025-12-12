@@ -18,26 +18,11 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
 
   final _dbService = FirebaseDatabaseService();
   final _authService = FirebaseAuthService();
-  
-  Future<List<Property>>? _bookmarksFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadBookmarks();
-  }
-
-  void _loadBookmarks() {
-    final user = _authService.getCurrentUser();
-    if (user != null) {
-      setState(() {
-        _bookmarksFuture = _dbService.getUserBookmarks(user.uid);
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
+    final user = _authService.getCurrentUser();
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bookmarks'),
@@ -45,38 +30,40 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
       ),
-      body: FutureBuilder<List<Property>>(
-        future: _bookmarksFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: primaryGreen),
-            );
-          }
+      body: user == null
+          ? const Center(child: Text('Please log in to view bookmarks'))
+          : StreamBuilder<List<Property>>(
+              stream: _dbService.getUserBookmarksStream(user.uid),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: primaryGreen),
+                  );
+                }
 
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 60, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text('Error: ${snapshot.error}'),
-                ],
-              ),
-            );
-          }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 60, color: Colors.red),
+                        const SizedBox(height: 16),
+                        Text('Error: ${snapshot.error}'),
+                      ],
+                    ),
+                  );
+                }
 
-          final properties = snapshot.data ?? [];
+                final properties = snapshot.data ?? [];
 
-          if (properties.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.bookmark_border, size: 80, color: Colors.grey[300]),
-                  const SizedBox(height: 16),
-                  Text(
+                if (properties.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.bookmark_border, size: 80, color: Colors.grey[300]),
+                        const SizedBox(height: 16),
+                        Text(
                     'No bookmarks yet',
                     style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                   ),
@@ -90,33 +77,23 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
             );
           }
 
-          return RefreshIndicator(
-            onRefresh: () async {
-              _loadBookmarks();
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: properties.length,
+            itemBuilder: (context, index) {
+              final property = properties[index];
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PropertyDetailsScreen(property: property),
+                    ),
+                  );
+                },
+                child: PropertyCard(property: property),
+              );
             },
-            color: primaryGreen,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: properties.length,
-              itemBuilder: (context, index) {
-                final property = properties[index];
-                return GestureDetector(
-                  onTap: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PropertyDetailsScreen(property: property),
-                      ),
-                    );
-                    // Refresh if bookmark was removed from details screen
-                    if (result == true) {
-                      _loadBookmarks();
-                    }
-                  },
-                  child: PropertyCard(property: property),
-                );
-              },
-            ),
           );
         },
       ),

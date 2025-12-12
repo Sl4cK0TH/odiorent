@@ -1,5 +1,95 @@
 # Changelog
 
+## [2025-12-12 - Critical Bug Fixes] 🐛
+
+### 1. Landlord Notifications System - FIXED ✅
+**Issue**: Landlord notifications button showed red indicator but notifications screen was empty.
+
+**Root Cause**: NotificationService was correctly querying Firestore 'notifications' collection, but no code was creating notification documents when landlord-relevant events occurred.
+
+**Fix**:
+- Added `createNotification()` method to FirebaseDatabaseService with standardized format:
+  - Parameters: recipientId, title, body, type, data (optional)
+  - Creates Firestore documents in 'notifications' collection
+  - Fields: recipient_id, title, body, type, data, is_read, created_at
+
+- Integrated notification creation for all landlord events:
+  - **New booking request**: Notifies landlord when renter creates booking
+  - **Property approval**: Notifies landlord when admin approves property
+  - **Property rejection**: Notifies landlord when admin rejects property
+  - **Booking approval**: Notifies BOTH landlord (confirmation) AND renter
+  - **Booking cancellation**: Notifies both landlord and renter
+  - **Booking status changes**: Notifies renter (approved, rejected, active, completed)
+
+- Updated `updatePropertyStatus()` to use new createNotification() format (replaced old direct Firestore call)
+
+**Files Modified**:
+- `lib/services/firebase_database_service.dart`: Added createNotification() method at line ~998
+- `lib/services/firebase_database_service.dart`: Updated createBooking(), updateBookingStatus(), updatePropertyStatus()
+
+---
+
+### 2. Renter Bookmark Functionality - FIXED ✅
+**Issue**: After removing a bookmark and re-bookmarking the same property, it wouldn't show in the Bookmarks tab until app restart.
+
+**Root Cause**: BookmarksScreen used FutureBuilder with Future<List<Property>>. Futures are one-time snapshots that don't react to Firestore changes. When a bookmark was added/removed, the Future wasn't re-executed.
+
+**Fix**:
+- Added `getUserBookmarksStream()` method to FirebaseDatabaseService
+  - Returns Stream<List<Property>> for real-time updates
+  - Uses snapshots() to listen to 'bookmarks' collection changes
+  - Uses asyncMap to fetch property details for each bookmark
+  - Sorts by createdAt descending
+
+- Updated BookmarksScreen to use StreamBuilder:
+  - Removed FutureBuilder, _loadBookmarks(), _bookmarksFuture, and initState()
+  - Replaced with StreamBuilder connected to getUserBookmarksStream()
+  - Removed RefreshIndicator (no longer needed with real-time stream)
+  - Removed result handling from PropertyDetailsScreen navigation
+  - Now automatically updates when bookmarks are added/removed
+
+**Files Modified**:
+- `lib/services/firebase_database_service.dart`: Added getUserBookmarksStream() at line ~1055
+- `lib/screens/renter/bookmarks_screen.dart`: Converted to StreamBuilder (lines 1-90)
+
+---
+
+### 3. Message Notification Recipient Bug - FIXED ✅
+**Issue**: When a user sent a message, they received the notification on their own device instead of the recipient receiving it.
+
+**Root Cause**: The `sendMessage()` method in FirebaseDatabaseService correctly identified the recipientId, but `sendMessageNotification()` in PushNotificationService called `_showLocalNotification()` which always displays on the CURRENT device (the sender's device). There was no check to verify if the current user is the intended recipient.
+
+**How it worked before**:
+1. User A sends message to User B
+2. Code runs on User A's device
+3. sendMessage() correctly finds recipientId = User B
+4. Calls sendMessageNotification(userId: User B, ...)
+5. sendMessageNotification() immediately shows local notification
+6. Notification appears on User A's device (sender) ❌
+
+**Fix**:
+- Updated `sendMessageNotification()` to check if current user is the recipient:
+  ```dart
+  final currentUser = _authService.getCurrentUser();
+  if (currentUser != null && currentUser.uid == userId) {
+    await _showLocalNotification(...);
+  }
+  ```
+- Only shows notification if currentUser.uid matches the recipientId
+- This prevents senders from seeing their own message notifications
+
+- Applied same fix to `sendBookingNotification()` for consistency
+
+**Note**: This is a local notification workaround. For production multi-device support, FCM push notifications with a backend service would be needed. However, for current testing on single devices, this fix ensures notifications only appear to the correct user.
+
+**Files Modified**:
+- `lib/services/push_notification_service.dart`: Added FirebaseAuthService import
+- `lib/services/push_notification_service.dart`: Added _authService field
+- `lib/services/push_notification_service.dart`: Updated sendMessageNotification() (line ~289)
+- `lib/services/push_notification_service.dart`: Updated sendBookingNotification() (line ~269)
+
+---
+
 ## [2025-12-12 - Latest Updates]
 
 ### Push Notifications & Permissions System - COMPLETE ✅

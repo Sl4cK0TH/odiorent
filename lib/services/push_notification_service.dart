@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
+import 'package:odiorent/services/firebase_auth_service.dart';
 import 'dart:io' show Platform;
 
 // Note: This function needs to be a top-level function (not a class method)
@@ -17,6 +18,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class PushNotificationService {
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final _dbService = FirebaseDatabaseService();
+  final _authService = FirebaseAuthService();
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
@@ -267,15 +269,19 @@ class PushNotificationService {
     required String bookingId,
     required String status,
   }) async {
-    await _showLocalNotification(
-      title: title,
-      body: body,
-      payload: 'booking',
-      data: {
-        'type': 'booking_$status',
-        'booking_id': bookingId,
-      },
-    );
+    // Only show notification if the current user is the recipient
+    final currentUser = _authService.getCurrentUser();
+    if (currentUser != null && currentUser.uid == userId) {
+      await _showLocalNotification(
+        title: title,
+        body: body,
+        payload: 'booking',
+        data: {
+          'type': 'booking_$status',
+          'booking_id': bookingId,
+        },
+      );
+    }
   }
 
   /// Send notification for new message
@@ -285,15 +291,20 @@ class PushNotificationService {
     required String messagePreview,
     required String chatId,
   }) async {
-    await _showLocalNotification(
-      title: senderName,
-      body: messagePreview,
-      payload: 'message',
-      data: {
-        'type': 'new_message',
-        'chat_id': chatId,
-      },
-    );
+    // Only show notification if the current user is the recipient
+    // This prevents the sender from seeing their own message notification
+    final currentUser = _authService.getCurrentUser();
+    if (currentUser != null && currentUser.uid == userId) {
+      await _showLocalNotification(
+        title: senderName,
+        body: messagePreview,
+        payload: 'message',
+        data: {
+          'type': 'new_message',
+          'chat_id': chatId,
+        },
+      );
+    }
   }
 
   /// Send general notification

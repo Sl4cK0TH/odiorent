@@ -217,7 +217,7 @@ class _LandlordBookingsScreenState extends State<LandlordBookingsScreen> {
         });
       },
       backgroundColor: Colors.grey[200],
-      selectedColor: const Color(0xFFFF6B6B),
+      selectedColor: const Color(0xFF4CAF50),
       labelStyle: TextStyle(
         color: isSelected ? Colors.white : Colors.black,
       ),
