@@ -1,5 +1,39 @@
 # Changelog
 
+## [2026-01-25 - Authentication Enhancements] ✨
+
+### 1. Remember Me Feature - ADDED ✅
+**Goal**: Allow users to save their email/username for quicker login access.
+
+**Implementation**:
+- Added `shared_preferences` dependency for secure local storage
+- Implemented logic in `LoginScreen`:
+  - saves email/username when "Remember Me" is checked
+  - Pre-fills email field on app restart/logout
+  - Persists "Remember Me" checkbox state
+- **Security Note**: Only persists the email/username, NOT the password, following security best practices.
+
+**Files Modified**:
+- `pubspec.yaml`: Added `shared_preferences: ^2.3.5`
+- `lib/screens/shared/login_screen.dart`: Added persistence logic
+
+---
+
+### 2. Forgot Password Feature - ADDED ✅
+**Goal**: Enable users to reset their password if forgotten.
+
+**Implementation**:
+- Implemented `_showForgotPasswordDialog` in `LoginScreen`
+- Integrated with `FirebaseAuthService.sendPasswordResetEmail()`
+- Added user feedback (success/error SnackBars)
+- Triggers standard Firebase password reset email flow
+- Validates email format before sending
+
+**Files Modified**:
+- `lib/screens/shared/login_screen.dart`: Added dialog and reset logic
+
+---
+
 ## [2025-12-12 - Critical Bug Fixes] 🐛
 
 ### 1. Landlord Notifications System - FIXED ✅

@@ -3,6 +3,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:odiorent/widgets/custom_button.dart';
 import 'package:odiorent/widgets/login_form_card.dart';
 import 'package:odiorent/services/firebase_auth_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -28,10 +29,27 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  @override
   void dispose() {
     _usernameEmailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  // Load saved credentials from simple storage
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _rememberMe = prefs.getBool('remember_me') ?? false;
+      if (_rememberMe) {
+        _usernameEmailController.text = prefs.getString('saved_email') ?? '';
+      }
+    });
   }
 
   // Handles the login logic
@@ -82,6 +100,16 @@ class _LoginScreenState extends State<LoginScreen> {
         email: emailToUse,
         password: _passwordController.text,
       );
+
+      // Handle Remember Me
+      final prefs = await SharedPreferences.getInstance();
+      if (_rememberMe) {
+        await prefs.setBool('remember_me', true);
+        await prefs.setString('saved_email', input); // Save the raw input (email or username)
+      } else {
+        await prefs.setBool('remember_me', false);
+        await prefs.remove('saved_email');
+      }
 
       debugPrint("✅ Sign in successful!");
 
@@ -160,11 +188,82 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // Handle forgot password
   void _handleForgotPassword() {
-    // TODO: Implement forgot password functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Forgot password feature coming soon!'),
-        backgroundColor: Colors.blue,
+    final emailController = TextEditingController();
+    // Pre-fill if email is already entered
+    if (_usernameEmailController.text.contains('@')) {
+      emailController.text = _usernameEmailController.text;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Enter your email address to receive a password reset link.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(
+                labelText: 'Email Address',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.email),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final email = emailController.text.trim();
+              if (email.isEmpty || !email.contains('@')) {
+                Fluttertoast.showToast(msg: "Please enter a valid email");
+                return;
+              }
+
+              try {
+                // Show loading indicator on button or dialog? 
+                // Simple approach: Close dialog and show loading snackbar
+                Navigator.pop(context);
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Sending reset email...')),
+                );
+
+                await FirebaseAuthService().sendPasswordResetEmail(email);
+
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Reset email sent! Check your inbox.'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error: ${e.toString()}'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryGreen,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Send Reset Link'),
+          ),
+        ],
       ),
     );
   }
