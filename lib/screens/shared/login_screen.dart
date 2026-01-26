@@ -188,6 +188,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // Handle forgot password
   void _handleForgotPassword() {
+    _showForgotPasswordDialog(context);
+  }
+
+  void _showForgotPasswordDialog(BuildContext context) {
     final emailController = TextEditingController();
     // Pre-fill if email is already entered
     if (_usernameEmailController.text.contains('@')) {
@@ -196,80 +200,76 @@ class _LoginScreenState extends State<LoginScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reset Password'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Enter your email address to receive a password reset link.',
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email Address',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.email),
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Reset Password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Enter your email address to receive a reset link.'),
+              const SizedBox(height: 10),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.email), // Added back the prefix icon
+                ),
+                keyboardType: TextInputType.emailAddress, // Added back keyboard type
               ),
-              keyboardType: TextInputType.emailAddress,
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final email = emailController.text.trim();
+                if (email.isEmpty || !email.contains('@')) { // Re-added email validation
+                  Fluttertoast.showToast(msg: "Please enter a valid email"); // Using Fluttertoast as in original
+                  return;
+                }
+
+                // Close dialog first
+                Navigator.pop(dialogContext);
+
+                try {
+                  // Show loading feedback using root context
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sending reset email...')),
+                  );
+
+                  await FirebaseAuthService().sendPasswordResetEmail(email);
+
+                  if (!context.mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Password reset email sent! Check your inbox.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryGreen,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Send Reset Link'),
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final email = emailController.text.trim();
-              if (email.isEmpty || !email.contains('@')) {
-                Fluttertoast.showToast(msg: "Please enter a valid email");
-                return;
-              }
-
-              try {
-                // Show loading indicator on button or dialog? 
-                // Simple approach: Close dialog and show loading snackbar
-                Navigator.pop(context);
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sending reset email...')),
-                );
-
-                await FirebaseAuthService().sendPasswordResetEmail(email);
-
-                if (!mounted) return;
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Password reset email sent! Check your inbox.'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-
-                // Close dialog
-                Navigator.of(context).pop();
-              } catch (e) {
-                if (!mounted) return;
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error: ${e.toString()}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryGreen,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Send Reset Link'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

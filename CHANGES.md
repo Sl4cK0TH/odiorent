@@ -58,6 +58,9 @@
 - `lib/services/firebase_auth_service.dart`: Updated `signUp` to handle new fields
 - `lib/screens/shared/signup_screen.dart`: Added UI for file upload and social link
 
+**Code Quality**:
+- `lib/screens/shared/login_screen.dart`: Fixed `use_build_context_synchronously` warnings in password reset dialog.
+
 ---
 
 ## [2025-12-12 - Critical Bug Fixes] 🐛
