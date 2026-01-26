@@ -7,6 +7,7 @@ import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:odiorent/services/cloudinary_service.dart';
 import 'package:odiorent/widgets/custom_button.dart';
+import 'package:odiorent/widgets/location_picker.dart'; // Import LocationPicker
 import 'package:path/path.dart' as p; // Import path package with prefix
 
 class AddPropertyScreen extends StatefulWidget {
@@ -51,6 +52,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   final ImagePicker _picker = ImagePicker(); // The image picker instance
   bool _isUploadingVideo = false;
   double _videoUploadProgress = 0.0;
+  
+  // New: Coordinates
+  double? _latitude;
+  double? _longitude;
 
   @override
   void dispose() {
@@ -180,6 +185,13 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       );
       return;
     }
+    
+    // Warn if location not picked but allow proceeding (optional)
+    if (_latitude == null || _longitude == null) {
+       // Optional: Force location picking
+       // For now, we'll allow it but maybe start a toast
+       // Fluttertoast.showToast(msg: "No location pinned, using address only");
+    }
 
     setState(() => _isLoading = true);
 
@@ -246,6 +258,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         videoUrls: videoUrls,
         status: PropertyStatus.pending, // Always 'pending' on creation
         createdAt: DateTime.now().toUtc(), // Set creation date
+        latitude: _latitude, // New
+        longitude: _longitude, // New
       );
 
       // 4. Save to Database
@@ -354,7 +368,24 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                     ),
                   ),
                 ),
-                  const SizedBox(height: 16),
+                const SizedBox(height: 16),
+                
+                // --- Location Picker ---
+                const Text(
+                  'Pin Location on Map (Optional)',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                LocationPicker(
+                  onLocationPicked: (lat, lng) {
+                    setState(() {
+                      _latitude = lat;
+                      _longitude = lng;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+
                   _buildTextField(
                     controller: _descriptionController,
                     labelText: 'Description',

@@ -57,13 +57,17 @@ class Property {
   final String? landlordEmail;
   final String? landlordFirstName;
   final String? landlordLastName;
-  final String? landlordUserName;  // Changed from landlordUsername for consistency
+  final String? landlordUserName;
   final String? landlordPhoneNumber;
-  final String? landlordProfilePictureUrl;  // Changed from landlordProfilePicture
+  final String? landlordProfilePictureUrl;
 
-  // New: Rating details (populated from the 'properties_with_avg_rating' view)
+  // New: Rating details
   final double averageRating;
   final int ratingCount;
+
+  // New: Location coordinates (Phase 2)
+  final double? latitude;
+  final double? longitude;
 
   // --- Constructor ---
   Property({
@@ -85,20 +89,18 @@ class Property {
     this.landlordEmail, // New (nullable)
     this.landlordFirstName,
     this.landlordLastName,
-    this.landlordUserName,  // Changed
+    this.landlordUserName,
     this.landlordPhoneNumber,
-    this.landlordProfilePictureUrl,  // Changed
+    this.landlordProfilePictureUrl,
     this.averageRating = 0.0, // New
     this.ratingCount = 0, // New
+    this.latitude, // New
+    this.longitude, // New
   });
 
   /// --- `toJson` Method ---
-  /// Converts a Property object into a Map (JSON) to be sent *to* Supabase.
-  /// This is used for creating or updating properties.
   Map<String, dynamic> toJson() {
     return {
-      // We don't send the 'id' when creating a new property,
-      // as Supabase generates it automatically.
       'landlord_id': landlordId,
       'name': name,
       'address': address,
@@ -109,15 +111,15 @@ class Property {
       'showers': showers,
       'image_urls': imageUrls,
       'video_urls': videoUrls,
-      'status': statusToString(status), // Convert enum to string
-      'created_at': createdAt.toIso8601String(), // Include created_at
-      'approved_at': approvedAt?.toIso8601String(), // Include approved_at if not null
+      'status': statusToString(status),
+      'created_at': createdAt.toIso8601String(),
+      'approved_at': approvedAt?.toIso8601String(),
+      'latitude': latitude, // New
+      'longitude': longitude, // New
     };
   }
 
-  /// --- `fromJson` Factory ---
-  /// Creates a Property object *from* a Map (JSON) received from Supabase.
-  /// This is used for reading properties from the database.
+  /// --- `fromMap` Factory ---
   factory Property.fromMap(Map<String, dynamic> json) {
     return Property(
       id: json['id'] as String?,
@@ -131,7 +133,7 @@ class Property {
       showers: json['showers'] as int,
       imageUrls: List<String>.from(json['image_urls'] as List<dynamic>),
       videoUrls: List<String>.from(json['video_urls'] as List<dynamic>? ?? []),
-      status: statusFromString(json['status'] as String), // Convert string to enum
+      status: statusFromString(json['status'] as String),
       createdAt: DateTime.parse(json['created_at'] as String),
       approvedAt: json['approved_at'] != null
           ? DateTime.parse(json['approved_at'] as String)
@@ -140,16 +142,17 @@ class Property {
       landlordEmail: json['email'] as String?,
       landlordFirstName: json['first_name'] as String?,
       landlordLastName: json['last_name'] as String?,
-      landlordUserName: json['user_name'] as String?,  // Changed
+      landlordUserName: json['user_name'] as String?,
       landlordPhoneNumber: json['phone_number'] as String?,
-      landlordProfilePictureUrl: json['profile_picture_url'] as String?,  // Changed
+      landlordProfilePictureUrl: json['profile_picture_url'] as String?,
       averageRating: (json['average_rating'] as num? ?? 0.0).toDouble(),
       ratingCount: json['rating_count'] as int? ?? 0,
+      latitude: (json['latitude'] as num?)?.toDouble(), // New
+      longitude: (json['longitude'] as num?)?.toDouble(), // New
     );
   }
 
   /// --- `toFirestore` Method ---
-  /// Converts a Property object into a Map for Firestore
   Map<String, dynamic> toFirestore() {
     return {
       'landlordId': landlordId,
@@ -167,11 +170,12 @@ class Property {
       'approvedAt': approvedAt,
       'averageRating': averageRating,
       'ratingCount': ratingCount,
+      'latitude': latitude, // New
+      'longitude': longitude, // New
     };
   }
 
   /// --- `fromFirestore` Factory ---
-  /// Creates a Property object from a Firestore DocumentSnapshot
   factory Property.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return Property(
@@ -191,11 +195,12 @@ class Property {
       approvedAt: (data['approvedAt'] as Timestamp?)?.toDate(),
       averageRating: (data['averageRating'] as num? ?? 0.0).toDouble(),
       ratingCount: data['ratingCount'] as int? ?? 0,
+      latitude: (data['latitude'] as num?)?.toDouble(), // New
+      longitude: (data['longitude'] as num?)?.toDouble(), // New
     );
   }
 
   /// --- `copyWith` Method ---
-  /// Creates a copy of this Property with some fields replaced
   Property copyWith({
     String? id,
     String? landlordId,
@@ -220,6 +225,8 @@ class Property {
     String? landlordProfilePictureUrl,
     double? averageRating,
     int? ratingCount,
+    double? latitude, // New
+    double? longitude, // New
   }) {
     return Property(
       id: id ?? this.id,
@@ -245,6 +252,8 @@ class Property {
       landlordProfilePictureUrl: landlordProfilePictureUrl ?? this.landlordProfilePictureUrl,
       averageRating: averageRating ?? this.averageRating,
       ratingCount: ratingCount ?? this.ratingCount,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
 }

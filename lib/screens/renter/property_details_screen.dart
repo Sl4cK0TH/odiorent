@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_map/flutter_map.dart'; // Import flutter_map
+import 'package:latlong2/latlong.dart'; // Import latlong2
 import 'package:odiorent/models/property.dart';
 import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
@@ -29,13 +31,50 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
   bool _isFetchingDetails = false;
   bool _isBookmarked = false;
   bool _isBookmarkLoading = false;
+  
+  // Availability Logic
+  int _availableBeds = 0;
+  bool _isLoadingAvailability = true;
 
   @override
   void initState() {
     super.initState();
     _property = widget.property;
+    _availableBeds = _property.beds; // Default to total
     _fetchPropertyDetails();
     _checkBookmarkStatus();
+    _fetchAvailability();
+  }
+
+  Future<void> _fetchAvailability() async {
+    if (_property.id == null) return;
+    try {
+      final activeBookings = await _dbService.getActiveBookingsByProperty(_property.id!);
+      
+      // Calculate occupied beds (assuming 1 booking = 1 bed for now, or use numberOfOccupants if applicable)
+      // The logic here depends on whether 'bookings' reserve the whole unit or just beds.
+      // Based on the 'beds' field, it implies individual bed rentals or just property capacity.
+      // Let's assume for this logic that 1 booking = 1 active occupancy unless specified otherwise.
+      int occupiedCount = 0;
+      for (var booking in activeBookings) {
+          // If booking has 'numberOfOccupants', use that, otherwise count as 1
+          occupiedCount += (booking['numberOfOccupants'] as int? ?? 1);
+      }
+
+      final calculatedAvailable = _property.beds - occupiedCount;
+      
+      if (mounted) {
+        setState(() {
+          _availableBeds = calculatedAvailable < 0 ? 0 : calculatedAvailable;
+          _isLoadingAvailability = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching availability: $e");
+      if (mounted) {
+        setState(() => _isLoadingAvailability = false);
+      }
+    }
   }
 
   Future<void> _checkBookmarkStatus() async {
@@ -122,6 +161,17 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
       );
       return;
     }
+    
+    // Check if fully booked
+    if (!_isLoadingAvailability && _availableBeds <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This property is currently fully booked.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     // Navigate to booking screen
     final result = await Navigator.push(
@@ -131,8 +181,9 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
       ),
     );
 
-    // If booking was successful, show confirmation
+    // If booking was successful, show confirmation and refresh
     if (result == true && mounted) {
+      _fetchAvailability(); // Refresh availability
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Booking request sent! The landlord will review your request.'),
@@ -225,6 +276,8 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
       setState(() {
         _property = detailedProperty;
         _isFetchingDetails = false;
+        // Refresh availability if beds count changed/initialized
+        _fetchAvailability();
       });
     } catch (e) {
       debugPrint('Error fetching property details: $e');
@@ -315,14 +368,14 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.calendar_today_outlined),
                       label: const Text('Book Now'),
-                      onPressed: _handleBookNow,
+                      onPressed: _availableBeds > 0 ? _handleBookNow : null, // Disable if full
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
-                        foregroundColor: primaryGreen,
+                        foregroundColor: _availableBeds > 0 ? primaryGreen : Colors.grey,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),
-                          side: const BorderSide(color: primaryGreen),
+                          side: BorderSide(color: _availableBeds > 0 ? primaryGreen : Colors.grey),
                         ),
                       ),
                     ),
@@ -429,6 +482,48 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
+                  
+                  // --- Map View (New) ---
+                  if (property.latitude != null && property.longitude != null) ...[
+                    Container(
+                      height: 150,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: FlutterMap(
+                          options: MapOptions(
+                            initialCenter: LatLng(property.latitude!, property.longitude!),
+                            initialZoom: 15.0,
+                            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none), // Static map
+                          ),
+                          children: [
+                            TileLayer(
+                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: 'com.odiorent.app',
+                            ),
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: LatLng(property.latitude!, property.longitude!),
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(
+                                    Icons.location_on,
+                                    color: Colors.red,
+                                    size: 40,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // --- Room/Bed/Shower Stats ---
                   // We re-use the same chip style from the Admin screen
@@ -441,7 +536,9 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                       const SizedBox(width: 12),
                       _buildStatChip(
                         Icons.bed_outlined,
-                        '${property.beds} Beds',
+                        _isLoadingAvailability 
+                            ? '...' 
+                            : '$_availableBeds/${property.beds} Available', // Updated to show availability
                       ),
                       const SizedBox(width: 12),
                       _buildStatChip(
