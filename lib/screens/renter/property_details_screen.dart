@@ -527,25 +527,28 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
 
                   // --- Room/Bed/Shower Stats ---
                   // We re-use the same chip style from the Admin screen
-                  Row(
-                    children: [
-                      _buildStatChip(
-                        Icons.meeting_room_outlined,
-                        '${property.rooms} Rooms',
-                      ),
-                      const SizedBox(width: 12),
-                      _buildStatChip(
-                        Icons.bed_outlined,
-                        _isLoadingAvailability 
-                            ? '...' 
-                            : '$_availableBeds/${property.beds} Available', // Updated to show availability
-                      ),
-                      const SizedBox(width: 12),
-                      _buildStatChip(
-                        Icons.shower_outlined,
-                        '${property.showers} Showers',
-                      ),
-                    ],
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildStatChip(
+                          Icons.meeting_room_outlined,
+                          '${property.rooms} Rooms',
+                        ),
+                        const SizedBox(width: 12),
+                        _buildStatChip(
+                          Icons.bed_outlined,
+                          _isLoadingAvailability 
+                              ? '...' 
+                              : '$_availableBeds/${property.beds} Available', 
+                        ),
+                        const SizedBox(width: 12),
+                        _buildStatChip(
+                          Icons.shower_outlined,
+                          '${property.showers} Showers',
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 24),
 
@@ -581,7 +584,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                               right: index < property.videoUrls.length - 1 ? 12 : 0,
                             ),
                             child: Container(
-                              width: MediaQuery.of(context).size.width - 32,
+                              width: MediaQuery.of(context).size.width - 48, // Match parent padding (24+24)
                               decoration: BoxDecoration(
                                 color: Colors.black,
                                 borderRadius: BorderRadius.circular(12),

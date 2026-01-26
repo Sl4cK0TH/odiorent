@@ -322,6 +322,13 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                       'Security Deposit',
                       '₱${NumberFormat('#,##0.00').format((bookingData['securityDeposit'] as num?)?.toDouble() ?? 0)}',
                     ),
+                    const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(
+                            'Note: A 50% downpayment is required to secure this booking.',
+                            style: TextStyle(fontStyle: FontStyle.italic, color: Colors.orange),
+                        ),
+                    ),
                     _buildInfoRow(
                       'Payment Method',
                       'Over the Counter',
