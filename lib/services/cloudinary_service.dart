@@ -28,14 +28,21 @@ class CloudinaryService {
     required String fileName,
     required String folder, // e.g., 'profile_pictures', 'property_images', 'virtual_tours'
     String? userId,
+    String? publicId, // Custom identifier (optional)
     CloudinaryResourceType? resourceType, // Auto-detect if null
   }) async {
     try {
       // Create unique filename
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final uniqueFileName = userId != null 
-          ? '${userId}_${timestamp}_$fileName'
-          : '${timestamp}_$fileName';
+      // Create unique filename if publicId is not provided
+      String identifier;
+      if (publicId != null) {
+        identifier = publicId;
+      } else {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        identifier = userId != null 
+            ? '${userId}_${timestamp}_$fileName'
+            : '${timestamp}_$fileName';
+      }
 
       // Auto-detect resource type from file extension if not specified
       final detectedResourceType = resourceType ?? _detectResourceType(fileName);
@@ -44,7 +51,7 @@ class CloudinaryService {
       final response = await _cloudinary.uploadFile(
         CloudinaryFile.fromBytesData(
           bytes,
-          identifier: uniqueFileName,
+          identifier: identifier,
           folder: folder,
           resourceType: detectedResourceType,
         ),
@@ -81,6 +88,7 @@ class CloudinaryService {
     required XFile file,
     required String folder,
     String? userId,
+    String? publicId,
   }) async {
     try {
       final bytes = await file.readAsBytes();
@@ -89,6 +97,7 @@ class CloudinaryService {
         fileName: file.name,
         folder: folder,
         userId: userId,
+        publicId: publicId,
       );
     } catch (e) {
       debugPrint('❌ Error uploading XFile: $e');

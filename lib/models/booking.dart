@@ -72,6 +72,12 @@ class Booking {
   final String? cancellationReason;
   final String? rejectionReason;
 
+  // Payment details
+  final String? proofOfPaymentUrl;
+  final String? paymentStatus; // 'pending', 'review', 'verified', 'rejected'
+  final DateTime? paymentUploadedAt;
+  final DateTime? paymentVerifiedAt;
+
   Booking({
     this.id,
     required this.propertyId,
@@ -99,6 +105,10 @@ class Booking {
     this.cancelledAt,
     this.cancellationReason,
     this.rejectionReason,
+    this.proofOfPaymentUrl,
+    this.paymentStatus,
+    this.paymentUploadedAt,
+    this.paymentVerifiedAt,
   });
 
   /// Convert to Firestore document
@@ -129,6 +139,10 @@ class Booking {
       'cancelledAt': cancelledAt != null ? Timestamp.fromDate(cancelledAt!) : null,
       'cancellationReason': cancellationReason,
       'rejectionReason': rejectionReason,
+      'proofOfPaymentUrl': proofOfPaymentUrl,
+      'paymentStatus': paymentStatus,
+      'paymentUploadedAt': paymentUploadedAt != null ? Timestamp.fromDate(paymentUploadedAt!) : null,
+      'paymentVerifiedAt': paymentVerifiedAt != null ? Timestamp.fromDate(paymentVerifiedAt!) : null,
     };
   }
 
@@ -168,6 +182,14 @@ class Booking {
           : null,
       cancellationReason: data['cancellationReason'] as String?,
       rejectionReason: data['rejectionReason'] as String?,
+      proofOfPaymentUrl: data['proofOfPaymentUrl'] as String?,
+      paymentStatus: data['paymentStatus'] as String?,
+      paymentUploadedAt: data['paymentUploadedAt'] != null 
+          ? (data['paymentUploadedAt'] as Timestamp).toDate() 
+          : null,
+      paymentVerifiedAt: data['paymentVerifiedAt'] != null 
+          ? (data['paymentVerifiedAt'] as Timestamp).toDate() 
+          : null,
     );
   }
 
@@ -199,6 +221,10 @@ class Booking {
     DateTime? cancelledAt,
     String? cancellationReason,
     String? rejectionReason,
+    String? proofOfPaymentUrl,
+    String? paymentStatus,
+    DateTime? paymentUploadedAt,
+    DateTime? paymentVerifiedAt,
   }) {
     return Booking(
       id: id ?? this.id,
@@ -227,6 +253,10 @@ class Booking {
       cancelledAt: cancelledAt ?? this.cancelledAt,
       cancellationReason: cancellationReason ?? this.cancellationReason,
       rejectionReason: rejectionReason ?? this.rejectionReason,
+      proofOfPaymentUrl: proofOfPaymentUrl ?? this.proofOfPaymentUrl,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      paymentUploadedAt: paymentUploadedAt ?? this.paymentUploadedAt,
+      paymentVerifiedAt: paymentVerifiedAt ?? this.paymentVerifiedAt,
     );
   }
 

@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:odiorent/models/booking.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
 
@@ -15,6 +17,68 @@ class BookingDetailsScreen extends StatefulWidget {
 class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   final _dbService = FirebaseDatabaseService();
   bool _isCancelling = false;
+  bool _isUploadingPayment = false;
+
+  Future<void> _pickAndUploadPayment() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    
+    if (pickedFile != null && mounted) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirm Upload'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+                if (pickedFile.path.isNotEmpty)
+                  Image.file(File(pickedFile.path), height: 200, fit: BoxFit.cover),
+                const SizedBox(height: 16),
+                const Text('Upload this image as proof of payment?'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Upload'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        setState(() {
+            _isUploadingPayment = true;
+        });
+        
+        try {
+            await _dbService.uploadProofOfPayment(
+                bookingId: widget.bookingId,
+                file: pickedFile,
+            );
+            
+            if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Payment uploaded successfully!')),
+                );
+                setState(() {}); // Refresh
+            }
+        } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error uploading payment: $e'), backgroundColor: Colors.red),
+              );
+            }
+        } finally {
+            if (mounted) setState(() => _isUploadingPayment = false);
+        }
+      }
+    }
+  }
 
   Future<void> _showCancelDialog(Map<String, dynamic> bookingData) async {
     final status = bookingStatusFromString(bookingData['status'] as String);
@@ -271,6 +335,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                   ],
                 ),
 
+                // Payment Information
+                _buildPaymentSection(bookingData),
+
                 // Timestamps
                 _buildSection(
                   'Timeline',
@@ -441,5 +508,54 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       case BookingStatus.cancelled:
         return Icons.block;
     }
+  }
+
+  Widget _buildPaymentSection(Map<String, dynamic> bookingData) {
+      final status = bookingData['status'] as String;
+      final paymentStatus = bookingData['paymentStatus'] as String?;
+      final proofUrl = bookingData['proofOfPaymentUrl'] as String?;
+      
+      // Only show if approved or active or if payment exists
+      if (status != 'approved' && status != 'active' && proofUrl == null) {
+          return const SizedBox.shrink();
+      }
+
+      return _buildSection(
+          'Payment Information',
+          [
+              if (proofUrl != null) ...[
+                 const Text('Proof of Payment:', style: TextStyle(fontWeight: FontWeight.bold)),
+                 const SizedBox(height: 8),
+                 ClipRRect(
+                     borderRadius: BorderRadius.circular(8),
+                     child: Image.network(proofUrl, height: 200, width: double.infinity, fit: BoxFit.cover),
+                 ),
+                 const SizedBox(height: 12),
+              ],
+              
+              if (paymentStatus != null)
+                 _buildInfoRow('Payment Status', paymentStatus.toUpperCase()),
+                 
+              if (status == 'approved' && paymentStatus != 'verified') ...[
+                 const SizedBox(height: 16),
+                 SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                        icon: const Icon(Icons.upload_file),
+                        label: Text(_isUploadingPayment ? 'Uploading...' : 'Upload Proof of Payment'),
+                        onPressed: _isUploadingPayment ? null : _pickAndUploadPayment,
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                        ),
+                    ),
+                 ),
+              ],
+          ],
+      );
   }
 }

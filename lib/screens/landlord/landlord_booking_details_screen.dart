@@ -265,6 +265,142 @@ class _LandlordBookingDetailsScreenState extends State<LandlordBookingDetailsScr
     }
   }
 
+  Future<void> _verifyPayment() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Verify Payment'),
+        content: const Text('Are you sure you want to verify this payment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Verify'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        _isProcessing = true;
+      });
+
+      try {
+        await _dbService.verifyPayment(widget.bookingId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Payment verified successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          setState(() {}); // Refresh the UI
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> _rejectPaymentProof() async {
+    final reasonController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reject Payment'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Please provide a reason for rejecting this payment:'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Rejection Reason',
+                hintText: 'e.g., Image is blurry, incorrect amount',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        _isProcessing = true;
+      });
+
+      try {
+        await _dbService.rejectPayment(widget.bookingId, reasonController.text.trim());
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Payment rejected'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          setState(() {}); // Refresh the UI
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+        }
+      }
+    }
+    reasonController.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -429,6 +565,9 @@ class _LandlordBookingDetailsScreenState extends State<LandlordBookingDetailsScr
                     ),
                   ],
                 ),
+
+                // Payment Verification
+                _buildPaymentVerificationSection(bookingData),
 
                 // Timestamps
                 _buildSection(
@@ -660,5 +799,70 @@ class _LandlordBookingDetailsScreenState extends State<LandlordBookingDetailsScr
       case BookingStatus.cancelled:
         return Icons.block;
     }
+  }
+
+  Widget _buildPaymentVerificationSection(Map<String, dynamic> bookingData) {
+    final proofUrl = bookingData['proofOfPaymentUrl'] as String?;
+    final paymentStatus = bookingData['paymentStatus'] as String?;
+    
+    if (proofUrl == null) {
+       return const SizedBox.shrink();
+    }
+
+    return _buildSection(
+      'Payment Verification',
+      [
+        const Text('Proof of Payment:', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        GestureDetector(
+            onTap: () {
+                showDialog(
+                    context: context,
+                    builder: (_) => Dialog(
+                        child: InteractiveViewer(
+                            child: Image.network(proofUrl),
+                        ),
+                    ),
+                );
+            },
+            child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(proofUrl, height: 200, width: double.infinity, fit: BoxFit.cover),
+            ),
+        ),
+        const SizedBox(height: 12),
+        if (paymentStatus != null)
+             _buildInfoRow('Status', paymentStatus.toUpperCase()),
+             
+        if (paymentStatus == 'review' || paymentStatus == 'pending' || paymentStatus == null) ...[
+            const SizedBox(height: 16),
+            Row(
+                children: [
+                    Expanded(
+                        child: ElevatedButton(
+                            onPressed: _isProcessing ? null : _rejectPaymentProof,
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Reject Payment'),
+                        ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                         child: ElevatedButton(
+                            onPressed: _isProcessing ? null : _verifyPayment,
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Verify Payment'),
+                         ),
+                    ),
+                ],
+            ),
+        ],
+      ],
+    );
   }
 }

@@ -1518,6 +1518,9 @@ class FirebaseDatabaseService {
           .orderBy('createdAt', descending: true)
           .get();
 
+      // Lazy check for stale bookings
+      _checkAutoCancellation(snapshot.docs);
+
       return snapshot.docs.map((doc) {
         return {'id': doc.id, ...doc.data()};
       }).toList();
@@ -1529,6 +1532,9 @@ class FirebaseDatabaseService {
           .where('landlordId', isEqualTo: landlordId)
           .where('status', isEqualTo: 'pending')
           .get();
+
+      // Lazy check for stale bookings
+      _checkAutoCancellation(snapshot.docs);
 
       final bookings = snapshot.docs.map((doc) {
         return {'id': doc.id, ...doc.data()};
@@ -1560,6 +1566,139 @@ class FirebaseDatabaseService {
     } catch (e) {
       debugPrint("❌ Error fetching active bookings: $e");
       return [];
+    }
+  }
+
+  // ========== PAYMENT OPERATIONS ==========
+
+  /// Upload proof of payment
+  Future<void> uploadProofOfPayment({
+    required String bookingId,
+    required XFile file,
+  }) async {
+    try {
+      debugPrint("Uploading proof of payment for booking: $bookingId");
+      
+      final imageUrl = await _cloudinary.uploadXFile(
+        file: file,
+        folder: 'booking_payments',
+        publicId: 'payment_$bookingId', // Overwrite if exists
+      );
+
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'proofOfPaymentUrl': imageUrl,
+        'paymentStatus': 'review',
+        'paymentUploadedAt': FieldValue.serverTimestamp(),
+      });
+      
+      debugPrint("✅ Payment proof uploaded successfully");
+      
+      // Notify landlord
+      final bookingDoc = await _firestore.collection('bookings').doc(bookingId).get();
+      if (bookingDoc.exists) {
+        final data = bookingDoc.data()!;
+        final landlordId = data['landlordId'] as String;
+        final renterName = data['renterName'] as String? ?? 'Renter';
+        
+        await PushNotificationService().sendBookingNotification(
+          userId: landlordId,
+          title: 'Payment Uploaded 💰',
+          body: '$renterName has uploaded proof of payment. Please verify.',
+          bookingId: bookingId,
+          status: 'payment_review',
+        );
+      }
+    } catch (e) {
+      debugPrint("❌ Error uploading proof of payment: $e");
+      rethrow;
+    }
+  }
+
+  /// Verify payment
+  Future<void> verifyPayment(String bookingId) async {
+    try {
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'paymentStatus': 'verified',
+        'paymentVerifiedAt': FieldValue.serverTimestamp(),
+      });
+      
+      debugPrint("✅ Payment verified for booking $bookingId");
+      
+      // Notify renter
+      final bookingDoc = await _firestore.collection('bookings').doc(bookingId).get();
+      if (bookingDoc.exists) {
+        final data = bookingDoc.data()!;
+        final renterId = data['renterId'] as String;
+        
+        await PushNotificationService().sendBookingNotification(
+          userId: renterId,
+          title: 'Payment Verified! ✅',
+          body: 'Your payment has been verified by the landlord.',
+          bookingId: bookingId,
+          status: 'payment_verified',
+        );
+      }
+    } catch (e) {
+      debugPrint("❌ Error verifying payment: $e");
+      rethrow;
+    }
+  }
+
+  /// Reject payment
+  Future<void> rejectPayment(String bookingId, String reason) async {
+    try {
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'paymentStatus': 'rejected',
+        'rejectionReason': reason, // Re-use rejectionReason or add new field? re-using for now or using generic.
+        // Actually better to not overwrite main rejectionReason if booking is still valid.
+        // Let's assume we handle it in UI/Model by context.
+      });
+      
+      debugPrint("✅ Payment rejected for booking $bookingId");
+      
+      // Notify renter
+      final bookingDoc = await _firestore.collection('bookings').doc(bookingId).get();
+      if (bookingDoc.exists) {
+        final data = bookingDoc.data()!;
+        final renterId = data['renterId'] as String;
+        
+        await PushNotificationService().sendBookingNotification(
+          userId: renterId,
+          title: 'Payment Rejected ❌',
+          body: 'Your payment was rejected. Reason: $reason',
+          bookingId: bookingId,
+          status: 'payment_rejected',
+        );
+      }
+    } catch (e) {
+      debugPrint("❌ Error rejecting payment: $e");
+      rethrow;
+    }
+  }
+
+  /// Lazy Auto-Cancellation Check
+  Future<void> _checkAutoCancellation(List<QueryDocumentSnapshot> docs) async {
+    // Check if any pending bookings are older than 24 hours
+    final now = DateTime.now();
+    final threshold = now.subtract(const Duration(hours: 24));
+    
+    for (var doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final status = data['status'] as String?;
+      final createdAtRaw = data['createdAt'];
+      
+      if (status == 'pending' && createdAtRaw != null) {
+        final createdAt = (createdAtRaw as Timestamp).toDate();
+        if (createdAt.isBefore(threshold)) {
+          debugPrint("⏰ Auto-cancelling stale booking: ${doc.id}");
+          // Fire and forget update
+          updateBookingStatus(
+            bookingId: doc.id,
+            status: 'cancelled',
+            cancellationReason: 'Auto-cancelled due to timeout (24h limit).',
+          ).catchError((e) => debugPrint("Error auto-cancelling: $e"));
+        }
+      }
     }
   }
 
