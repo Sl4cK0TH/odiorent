@@ -241,14 +241,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 await FirebaseAuthService().sendPasswordResetEmail(email);
 
                 if (!mounted) return;
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Reset email sent! Check your inbox.'),
+                    content: Text('Password reset email sent! Check your inbox.'),
                     backgroundColor: Colors.green,
                   ),
                 );
+
+                // Close dialog
+                Navigator.of(context).pop();
               } catch (e) {
                 if (!mounted) return;
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Error: ${e.toString()}'),

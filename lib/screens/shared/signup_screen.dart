@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-// These imports are now correct
+import 'package:image_picker/image_picker.dart';
+import 'package:odiorent/services/cloudinary_service.dart';
 import 'package:odiorent/widgets/form_card.dart';
 import 'package:odiorent/widgets/custom_button.dart';
 import 'package:odiorent/services/firebase_auth_service.dart';
@@ -30,11 +32,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _facebookUrlController = TextEditingController(); // New
 
   // State variables
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  XFile? _birPermitImage; // New
 
   @override
   void dispose() {
@@ -46,7 +50,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _facebookUrlController.dispose();
     super.dispose();
+  }
+
+  // Handle Image Picking
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _birPermitImage = image;
+      });
+    }
   }
 
   // Handles the sign-up logic
@@ -54,10 +70,31 @@ class _SignUpScreenState extends State<SignUpScreen> {
     // Check if form is valid
     if (!_formKey.currentState!.validate()) return;
 
+    // Additional validations
+    if (widget.role == 'landlord' && _birPermitImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please upload your BIR Permit for verification.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     // Show loading spinner
     setState(() => _isLoading = true);
 
     try {
+      // 1. Upload BIR Permit if Landlord
+      String? birPermitUrl;
+      if (widget.role == 'landlord' && _birPermitImage != null) {
+        final cloudinary = CloudinaryService();
+        birPermitUrl = await cloudinary.uploadXFile(
+          file: _birPermitImage!,
+          folder: 'bir_permits',
+        );
+      }
+
       // Format phone number: remove leading 0 and add +63
       String phoneNumber = _phoneNumberController.text.trim();
       if (phoneNumber.startsWith('0')) {
@@ -78,7 +115,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
         userName: _userNameController.text.trim(),
         phoneNumber: phoneNumber,
         role: widget.role,
+        birPermitUrl: birPermitUrl,
+        facebookUrl: widget.role == 'renter'
+            ? _facebookUrlController.text.trim()
+            : null,
       );
+      
       if (!mounted) return;
 
       // Show success message
@@ -249,6 +291,123 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               // Phone Number Field with +63 prefix
                               _buildPhoneNumberField(),
                               const SizedBox(height: 10),
+
+                              // --- Conditional Verification Fields ---
+                              if (widget.role == 'renter') ...[
+                                _buildTextField(
+                                  controller: _facebookUrlController,
+                                  labelText: 'Facebook Profile Link',
+                                  prefixIcon: Icons.facebook,
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter your Facebook profile link';
+                                    }
+                                    if (!value.toLowerCase().contains('facebook.com')) {
+                                      return 'Please enter a valid Facebook URL';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 10),
+                              ],
+
+                              if (widget.role == 'landlord') ...[
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.black26),
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'BIR Permit (Required)',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      if (_birPermitImage != null)
+                                        Stack(
+                                          children: [
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(8),
+                                              child: Image.file(
+                                                File(_birPermitImage!.path),
+                                                height: 150,
+                                                width: double.infinity,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
+                                            Positioned(
+                                              top: 4,
+                                              right: 4,
+                                              child: GestureDetector(
+                                                onTap: () {
+                                                  setState(() {
+                                                    _birPermitImage = null;
+                                                  });
+                                                },
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(4),
+                                                  decoration: const BoxDecoration(
+                                                    color: Colors.red,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.close,
+                                                    size: 16,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      else
+                                        InkWell(
+                                          onTap: _pickImage,
+                                          child: Container(
+                                            height: 100,
+                                            width: double.infinity,
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[200],
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: Colors.black12,
+                                                style: BorderStyle.solid,
+                                              ),
+                                            ),
+                                            child: const Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.camera_alt,
+                                                  size: 30,
+                                                  color: Colors.black54,
+                                                ),
+                                                SizedBox(height: 4),
+                                                Text(
+                                                  'Tap to upload BIR Permit photo',
+                                                  style: TextStyle(
+                                                    color: Colors.black54,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                              ],
+                              // ---------------------------------------
 
                               // Email Field
                               _buildTextField(

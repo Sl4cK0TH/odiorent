@@ -29,6 +29,8 @@ class FirebaseAuthService {
     String? middleName,
     required String userName,
     required String phoneNumber,
+    String? birPermitUrl,
+    String? facebookUrl,
   }) async {
     try {
       if (kDebugMode) {
@@ -62,8 +64,11 @@ class FirebaseAuthService {
         'userName': userName,
         'phoneNumber': phoneNumber,
         'profilePictureUrl': null,
+        'birPermitUrl': birPermitUrl,
+        'isVerified': false, // Default to false
+        'facebookUrl': facebookUrl,
         'createdAt': FieldValue.serverTimestamp(),
-        'lastSeen': FieldValue.serverTimestamp(),
+        'lastSeen': FieldValue.serverTimestamp(), // Initialize lastSeen
       });
 
       if (kDebugMode) {

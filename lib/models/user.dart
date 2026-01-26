@@ -32,7 +32,10 @@ class AppUser {
   final String userName;
   final String phoneNumber;
   final String? profilePictureUrl;
-  final DateTime? lastSeen; // For online presence
+  final DateTime? lastSeen;
+  final String? birPermitUrl; // New: For Landlord verification
+  final bool isVerified;      // New: Verification status
+  final String? facebookUrl;  // New: For Renter verification
 
   AppUser({
     required this.id,
@@ -44,7 +47,10 @@ class AppUser {
     required this.userName,
     required this.phoneNumber,
     this.profilePictureUrl,
-    this.lastSeen, // Add to constructor
+    this.lastSeen,
+    this.birPermitUrl,
+    this.isVerified = false,
+    this.facebookUrl,
   });
 
   // Factory constructor to create an AppUser from a JSON map
@@ -59,10 +65,12 @@ class AppUser {
       userName: json['user_name'],
       phoneNumber: json['phone_number'],
       profilePictureUrl: json['profile_picture_url'],
-      // Parse the last_seen timestamp
       lastSeen: json['last_seen'] == null
           ? null
           : DateTime.parse(json['last_seen'] as String),
+      birPermitUrl: json['bir_permit_url'],
+      isVerified: json['is_verified'] ?? false,
+      facebookUrl: json['facebook_url'],
     );
   }
 
@@ -79,6 +87,9 @@ class AppUser {
       'phoneNumber': phoneNumber,
       'profilePictureUrl': profilePictureUrl,
       'lastSeen': lastSeen != null ? Timestamp.fromDate(lastSeen!) : null,
+      'birPermitUrl': birPermitUrl,
+      'isVerified': isVerified,
+      'facebookUrl': facebookUrl,
     };
   }
 
@@ -97,6 +108,9 @@ class AppUser {
       phoneNumber: data['phoneNumber'] as String,
       profilePictureUrl: data['profilePictureUrl'] as String?,
       lastSeen: (data['lastSeen'] as Timestamp?)?.toDate(),
+      birPermitUrl: data['birPermitUrl'] as String?,
+      isVerified: data['isVerified'] as bool? ?? false,
+      facebookUrl: data['facebookUrl'] as String?,
     );
   }
 }

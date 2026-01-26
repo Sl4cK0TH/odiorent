@@ -45,6 +45,21 @@
 
 ---
 
+### 4. Verification & Compliance (Phase 1) - ADDED ✅
+**Goal**: Legitimize users and ensure compliance per panel suggestions.
+
+**Implementation**:
+- **Landlords**: Added `birPermitUrl` field. Sign-up now requires uploading a photo of the BIR Permit (stored in Cloudinary).
+- **Renters**: Added `facebookUrl` field. Sign-up now requests Facebook Profile link for identity verification.
+- **Database**: Updated `users` collection to store verification proofs.
+
+**Files Modified**:
+- `lib/models/user.dart`: Added verification fields
+- `lib/services/firebase_auth_service.dart`: Updated `signUp` to handle new fields
+- `lib/screens/shared/signup_screen.dart`: Added UI for file upload and social link
+
+---
+
 ## [2025-12-12 - Critical Bug Fixes] 🐛
 
 ### 1. Landlord Notifications System - FIXED ✅
