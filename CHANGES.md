@@ -1,5 +1,34 @@
 # Changelog
 
+## [v1.0.6-alphatest] - Panel Recommendations Implementation 🚀
+
+### 1. Verification & Compliance System (Phase 1) - ADDED ✅
+**Goal**: Legitimize users and ensure compliance per panel suggestions.
+- **Landlords**: Added `birPermitUrl` field and upload capability.
+- **Renters**: Added `facebookUrl` field for identity verification.
+- **Database**: Updated `users` collection to store verification proofs.
+
+### 2. Property & Inventory Enhancements (Phase 2) - ADDED ✅
+**Goal**: Improve listing accuracy and location services.
+- **Inventory Logic**: Automated "Available Beds" calculation (Total Beds - Occupied).
+- **Mapping Integration**: Integrated `flutter_map` (OpenStreetMap) for accurate location display.
+- **Location Picker**: Added interactive map picker in "Add Property" screen.
+- **Mini-Map**: Displayed static map preview in Property Details.
+
+### 3. Booking & Payments System (Phase 3) - ADDED ✅
+**Goal**: Secure financial transactions and automate workflow.
+- **Proof of Payment**:
+  - Renters can now upload payment receipts (e.g., GCash) for approved bookings.
+  - Landlords can view and "Verify" or "Reject" these payments.
+- **Auto-Cancellation**: Implemented lazy logic to auto-cancel pending bookings > 24 hours.
+- **Reservation Policy**: Added visual enforcement of "50% downpayment required" rule.
+
+### 4. Bug Fixes & UX Improvements 🛠️
+- **Property Details**: Fixed "Right Overflow" in Rooms/Beds stats by making the row scrollable.
+- **Virtual Tour**: Addressed sizing issues (deferred final refactor).
+
+---
+
 ## [2026-01-25 - Authentication Enhancements] ✨
 
 ### 1. Remember Me Feature - ADDED ✅
