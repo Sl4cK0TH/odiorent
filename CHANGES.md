@@ -27,6 +27,13 @@
 - **Property Details**: Fixed "Right Overflow" in Rooms/Beds stats by making the row scrollable.
 - **Virtual Tour**: Addressed sizing issues (deferred final refactor).
 
+### 5. Documentation & Setup 📝
+- **Installation Guide (INSTALLATION.md)**:
+  - **Restructured**: Moved "Clone Repository" to Part 1 for better flow.
+  - **OS-Specific**: Added separate, detailed commands for Windows, macOS, and Linux for all steps (Git, Node.js, Flutter).
+  - **Configuration**: Updated Firebase setup and corrected Cloudinary service integration steps.
+  - **Troubleshooting**: Added common solutions for Java/Gradle build issues.
+
 ---
 
 ## [2026-01-25 - Authentication Enhancements] ✨

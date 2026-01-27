@@ -1,217 +1,211 @@
 # Installation and Build Guide for OdioRent
 
-This document provides detailed instructions on how to set up the OdioRent project on a new development machine and how to build a release version of the Android application.
+This document provides detailed instructions on how to set up the OdioRent project on a new development machine and how to build a release version of the application.
 
-## Part 1: Prerequisites
+---
 
-Before you begin, ensure your development environment has the following software installed.
+## Part 1: Clone the Repository
 
-### 1.1. Git
-Git is required for cloning the project repository.
-- **To Install:** Download it from the [official Git website](https://git-scm.com/downloads).
-- **To Verify:** Open a terminal and run `git --version`.
+Start by getting the source code.
+*Note: This step requires Git to be installed (see Part 2).*
 
-### 1.2. Flutter SDK
-Flutter is the UI toolkit used for this application.
-- **To Install:** Follow the official [Flutter installation guide](https://flutter.dev/docs/get-started/install) for your specific operating system (Windows, macOS, or Linux). This guide will also help you set up Dart.
-- **Recommended Version:** Flutter SDK ^3.9.2
-- **To Verify:** Run `flutter doctor` in your terminal. This command checks your environment and displays a report of the status of your Flutter installation. Address any issues it reports.
+**Option A: Using Git (Recommended)**
 
-### 1.3. IDE (Integrated Development Environment)
-You need a code editor to work with the project. Visual Studio Code is recommended.
-- **To Install:** Download [VS Code](https://code.visualstudio.com/).
-- **Recommended Extensions:**
-  - `Flutter` (provides Flutter support and developer tools).
-  - `Dart` (provides language support for Dart).
-
-## Part 2: Firebase Backend Setup
-
-This project uses Firebase for its backend (database, authentication, storage, and push notifications).
-
-### 2.1. Create a Firebase Project
-
-1.  **Create a Firebase Account:** Go to [firebase.google.com](https://firebase.google.com) and sign in with your Google account.
-2.  **Create a New Project:** 
-    - Click "Add project" or "Create a project"
-    - Give it a name (e.g., "OdioRent")
-    - Choose whether to enable Google Analytics (optional)
-    - Click "Create project"
-
-### 2.2. Enable Firebase Services
-
-#### Authentication
-1. In the Firebase Console, go to **Build > Authentication**
-2. Click "Get Started"
-3. Enable **Email/Password** sign-in method
-4. Click "Save"
-
-#### Firestore Database
-1. Go to **Build > Firestore Database**
-2. Click "Create database"
-3. Choose **Production mode** (security rules are already configured in the app)
-4. Select a Cloud Firestore location (choose closest to your target users)
-5. Click "Enable"
-
-#### Storage
-1. Go to **Build > Storage**
-2. Click "Get Started"
-3. Choose **Production mode**
-4. Select a storage location
-5. Click "Done"
-
-#### Cloud Messaging (Push Notifications)
-1. Go to **Build > Cloud Messaging**
-2. Click "Get Started" if prompted
-3. The service will be automatically enabled
-
-### 2.3. Configure Firebase for Android
-
-1. In the Firebase Console, click the **Android icon** to add an Android app
-2. Register your app with the package name: `com.example.odiorent` (or your custom package name)
-3. Download the `google-services.json` file
-4. Place it in the `android/app/` directory of your Flutter project
-
-### 2.4. Configure Firebase for iOS
-
-1. In the Firebase Console, click the **iOS icon** to add an iOS app
-2. Register your app with the bundle ID (found in `ios/Runner/Info.plist`)
-3. Download the `GoogleService-Info.plist` file
-4. Place it in the `ios/Runner/` directory of your Flutter project
-
-### 2.5. Firebase Configuration File
-
-The Firebase configuration is located in `lib/firebase_options.dart`. This file is already included in the project. If you need to regenerate it:
-
+**Windows / macOS / Linux:**
+Open your terminal (Command Prompt, PowerShell, or Terminal) and run:
 ```bash
-# Install FlutterFire CLI
-dart pub global activate flutterfire_cli
-
-# Run configuration
-flutterfire configure
+git clone https://github.com/Sl4cK0TH/odiorent.git
+cd odiorent
 ```
 
-## Part 3: Cloudinary Setup
+**Option B: Download ZIP**
+If you don't have Git yet, you can download the [ZIP file from GitHub](https://github.com/Sl4cK0TH/odiorent/archive/refs/heads/main.zip) and extract it.
 
-This project uses Cloudinary for image and video storage.
+---
 
-1.  **Create a Cloudinary Account:** Go to [cloudinary.com](https://cloudinary.com) and sign up for a free account.
-2.  **Get API Credentials:**
-    - Go to your Cloudinary Dashboard
-    - Find your **Cloud Name**, **API Key**, and **API Secret**
-3.  **Configure in Project:**
-    - Open `lib/services/storage_service.dart`
-    - Update the CloudinaryPublic constructor with your credentials:
-      ```dart
-      final cloudinary = CloudinaryPublic('your-cloud-name', 'your-upload-preset', cache: false);
-      ```
-4.  **Create Upload Preset:**
-    - In Cloudinary Dashboard, go to **Settings > Upload**
-    - Scroll to "Upload presets"
-    - Click "Add upload preset"
-    - Set Signing Mode to "Unsigned"
-    - Configure folder, transformations, etc. as needed
-    - Copy the preset name and use it in the code above
+## Part 2: Prerequisites
 
-## Part 4: Local Project Setup
+Ensure your development environment has the following software installed.
 
-Now, set up the Flutter project on your local machine.
+### 2.1. Git
+Git is required for version control.
 
-1.  **Clone the Repository:**
-    ```bash
-    git clone https://github.com/Sl4cK0TH/odiorent.git
-    cd odiorent
+**Windows:**
+1.  Download the **64-bit Git for Windows Setup** from [git-scm.com](https://git-scm.com/download/win).
+2.  Run the installer and follow the prompts.
+3.  Open **Command Prompt** or **PowerShell** and verify:
+    ```cmd
+    git --version
     ```
 
-2.  **Install Dependencies:**
+**macOS / Linux:**
+-   **macOS:** `brew install git`
+-   **Linux (Ubuntu/Debian):**
     ```bash
-    flutter pub get
+    sudo apt update
+    sudo apt install git
+    ```
+-   **Verify:**
+    ```bash
+    git --version
     ```
 
-3.  **Verify Configuration:**
-    - Ensure `google-services.json` is in `android/app/`
-    - Ensure `GoogleService-Info.plist` is in `ios/Runner/`
-    - Ensure Cloudinary credentials are configured in `lib/services/storage_service.dart`
+### 2.2. Node.js (Required for Firebase CLI)
 
-## Part 5: Running and Building the Application
+**Windows:**
+1.  Download [Node.js LTS](https://nodejs.org/).
+2.  Install (ensure "Add to PATH" is selected).
+3.  Verify:
+    ```cmd
+    node --version
+    npm --version
+    ```
 
-### 5.1. Run in Debug Mode
+**macOS / Linux:**
+-   **macOS:** `brew install node`
+-   **Linux:**
+    ```bash
+    sudo apt install nodejs npm
+    ```
+-   **Verify:**
+    ```bash
+    node --version
+    npm --version
+    ```
 
-To run the app on a connected device or emulator for development and testing:
+### 2.3. Flutter SDK
 
-**Renter Interface:**
+1.  **Download:** Follow the [Flutter installation guide](https://flutter.dev/docs/get-started/install).
+2.  **Add to PATH:** Add `flutter/bin` to your system PATH.
+3.  **Verify (All OS):**
+    ```bash
+    flutter doctor
+    ```
+
+### 2.4. IDE
+**Visual Studio Code** is recommended.
+-   Install [VS Code](https://code.visualstudio.com/).
+-   Install **Flutter** and **Dart** extensions.
+
+---
+
+## Part 3: Install Project Dependencies
+
+Once you have Flutter installed and the repo cloned:
+
+**Windows / macOS / Linux:**
+```bash
+cd odiorent
+flutter pub get
+```
+
+---
+
+## Part 4: Firebase Backend Setup
+
+### 4.1. Install Firebase CLI
+
+**Windows:**
+```cmd
+npm install -g firebase-tools
+```
+
+**macOS / Linux:**
+```bash
+sudo npm install -g firebase-tools
+```
+
+### 4.2. Login and Configure
+
+1.  **Login:**
+    ```bash
+    firebase login
+    ```
+
+2.  **Install FlutterFire CLI:**
+    ```bash
+    dart pub global activate flutterfire_cli
+    ```
+    **Add to PATH:**
+    -   **Windows:** Add `%LOCALAPPDATA%\Pub\Cache\bin` to PATH.
+    -   **macOS/Linux:** Add `export PATH="$PATH":"$HOME/.pub-cache/bin"` to `~/.zshrc` or `~/.bashrc`.
+
+3.  **Configure:**
+    ```bash
+    flutterfire configure
+    ```
+    -   Select project, select platforms (Android, iOS).
+
+### 4.3. Manual Verification
+-   **Android:** Ensure `android/app/google-services.json` exists.
+-   **iOS:** Ensure `ios/Runner/GoogleService-Info.plist` exists.
+
+---
+
+## Part 5: Cloudinary Setup
+
+1.  **Account:** Sign up at [cloudinary.com](https://cloudinary.com).
+2.  **Credentials:** Get Cloud Name, API Key, API Secret from Dashboard.
+3.  **Upload Preset:**
+    -   Settings > Upload > Upload presets > Add upload preset.
+    -   Mode: **Unsigned**.
+    -   Name: e.g., `odiorent_uploads`.
+4.  **Update Code:**
+    -   Edit `lib/services/cloudinary_service.dart`:
+    ```dart
+    static const String _cloudName = 'YOUR_CLOUD_NAME';
+    static const String _uploadPreset = 'YOUR_UPLOAD_PRESET';
+    ```
+
+---
+
+## Part 6: Building and Running
+
+### 6.1. Run in Debug Mode
+
+**Renter App (Mobile):**
 ```bash
 flutter run
 ```
 
-**Landlord/Admin Interface:**
+**Admin Web Panel:**
 ```bash
-flutter run lib/main_admin.dart
+flutter run -d chrome -t lib/main_admin.dart
 ```
 
-### 5.2. Build a Release APK (for Android)
-
-To build a release version of the app for Android:
-
-```bash
-flutter build apk --release
-```
-
-The output APK will be located at `build/app/outputs/flutter-apk/app-release.apk`.
-
-### 5.3. Build an App Bundle (Recommended for Google Play)
-
-```bash
-flutter build appbundle --release
-```
-
-The output bundle will be at `build/app/outputs/bundle/release/app-release.aab`.
-
-### 5.4. Troubleshooting Common Build Issues
-
-#### Gradle Daemon Crash
-If you see an error like `Gradle build daemon disappeared unexpectedly`, it's often due to a lack of memory. Try the following:
-
-```bash
-# Navigate to the android directory
-cd android
-./gradlew clean
-cd ..
-
-# Clean Flutter build cache
-flutter clean
-
-# Try building again
-flutter build apk --release
-```
-
-#### Java Compiler (JDK) Not Found
-If you encounter an error like `Toolchain installation does not provide the required capabilities: [JAVA_COMPILER]`:
-
-**Solution:** Explicitly set the `JAVA_HOME` environment variable to point to your JDK installation path.
-
-**Linux/macOS:**
-```bash
-export JAVA_HOME=/path/to/your/jdk
-```
+### 6.2. Build Release APK
 
 **Windows:**
 ```cmd
-set JAVA_HOME=C:\path\to\your\jdk
+flutter build apk --release
 ```
 
-#### Firebase Configuration Issues
-If you encounter Firebase-related errors:
-- Verify `google-services.json` and `GoogleService-Info.plist` are in the correct directories
-- Run `flutterfire configure` to regenerate configuration
-- Ensure all Firebase services are enabled in the Firebase Console
+**macOS / Linux:**
+```bash
+flutter build apk --release
+```
 
-#### Cloudinary Upload Failures
-If image/video uploads fail:
-- Verify your Cloud Name and Upload Preset are correct
-- Check that the upload preset is set to "Unsigned" mode
-- Ensure your Cloudinary account has sufficient storage (free tier: 25GB)
-    -   On Linux/macOS, find the path with `which javac` and add the following to your `~/.bashrc` or `~/.zshrc`:
-        ```bash
-        export JAVA_HOME="/path/to/your/jdk"
-        ```
-        (Remember to use the correct path and `source` the file or restart your terminal.)
+**Output:** `build/app/outputs/flutter-apk/app-release.apk`
+
+---
+
+## Troubleshooting
+
+### Java/Gradle Issues
+
+**Windows:**
+```cmd
+set JAVA_HOME="C:\Program Files\Java\jdk-17"
+```
+
+**macOS / Linux:**
+```bash
+export JAVA_HOME="/path/to/your/jdk"
+```
+
+### Release Build Fails?
+```bash
+flutter clean
+flutter pub get
+flutter build apk --release
+```
