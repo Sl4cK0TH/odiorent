@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:odiorent/models/booking.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LandlordBookingDetailsScreen extends StatefulWidget {
   final String bookingId;
@@ -266,11 +267,29 @@ class _LandlordBookingDetailsScreenState extends State<LandlordBookingDetailsScr
   }
 
   Future<void> _verifyPayment() async {
+    final messageController = TextEditingController();
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Verify Payment'),
-        content: const Text('Are you sure you want to verify this payment?'),
+        content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+                const Text('Are you sure you want to verify this payment? This will confirm the booking.'),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: messageController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Optional Message to Renter',
+                    hintText: 'e.g., Payment received, thank you!',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+            ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -282,7 +301,7 @@ class _LandlordBookingDetailsScreenState extends State<LandlordBookingDetailsScr
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Verify'),
+            child: const Text('Accept & Verify'),
           ),
         ],
       ),
@@ -294,12 +313,12 @@ class _LandlordBookingDetailsScreenState extends State<LandlordBookingDetailsScr
       });
 
       try {
-        await _dbService.verifyPayment(widget.bookingId);
+        await _dbService.verifyPayment(widget.bookingId, message: messageController.text.trim().isEmpty ? null : messageController.text.trim());
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Payment verified successfully'),
+              content: Text('Payment verified successfully! Booking is now active.'),
               backgroundColor: Colors.green,
             ),
           );
@@ -322,6 +341,7 @@ class _LandlordBookingDetailsScreenState extends State<LandlordBookingDetailsScr
         }
       }
     }
+    messageController.dispose();
   }
 
   Future<void> _rejectPaymentProof() async {
@@ -501,6 +521,49 @@ class _LandlordBookingDetailsScreenState extends State<LandlordBookingDetailsScr
                       _buildInfoRow('Email', bookingData['renterEmail'] as String),
                     if (bookingData['renterPhone'] != null)
                       _buildInfoRow('Phone', bookingData['renterPhone'] as String),
+
+                    // Facebook Link
+                    FutureBuilder<Map<String, dynamic>?>(
+                        future: _dbService.getUserById(bookingData['renterId']),
+                        builder: (context, userSnapshot) {
+                            if (!userSnapshot.hasData) return const SizedBox.shrink();
+                            final userData = userSnapshot.data!;
+                            final fbLink = userData['facebookLink'] as String?;
+                            
+                            if (fbLink == null || fbLink.isEmpty) return const SizedBox.shrink();
+
+                            return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                child: InkWell(
+                                    onTap: () async {
+                                        final uri = Uri.tryParse(fbLink);
+                                        if (uri != null && await canLaunchUrl(uri)) {
+                                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                        } else {
+                                            if (context.mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(content: Text('Could not launch user profile: $fbLink')),
+                                                );
+                                            }
+                                        }
+                                    },
+                                    child: Row(
+                                        children: [
+                                            const Icon(Icons.facebook, color: Colors.blue),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                                "View Facebook Profile",
+                                                style: TextStyle(
+                                                    color: Colors.blue.shade700,
+                                                    decoration: TextDecoration.underline,
+                                                ),
+                                            ),
+                                        ],
+                                    ),
+                                ),
+                            );
+                        },
+                    ),
                   ],
                 ),
 
@@ -802,67 +865,82 @@ class _LandlordBookingDetailsScreenState extends State<LandlordBookingDetailsScr
   }
 
   Widget _buildPaymentVerificationSection(Map<String, dynamic> bookingData) {
-    final proofUrl = bookingData['proofOfPaymentUrl'] as String?;
-    final paymentStatus = bookingData['paymentStatus'] as String?;
-    
-    if (proofUrl == null) {
-       return const SizedBox.shrink();
+      final paymentStatus = bookingData['paymentStatus'] as String?;
+      final proofUrl = bookingData['proofOfPaymentUrl'] as String?;
+      
+      if (proofUrl == null) {
+          return const SizedBox.shrink();
+      }
+
+      return _buildSection(
+          'Payment Verification',
+          [
+             const Text('Proof of Payment:', style: TextStyle(fontWeight: FontWeight.bold)),
+             const SizedBox(height: 8),
+             GestureDetector(
+                 onTap: () {
+                     showDialog(
+                         context: context,
+                         builder: (context) => Dialog(
+                             child: InteractiveViewer(
+                                 child: Image.network(proofUrl),
+                             ),
+                         ),
+                     );
+                 },
+                 child: ClipRRect(
+                     borderRadius: BorderRadius.circular(8),
+                     child: Image.network(proofUrl, height: 250, width: double.infinity, fit: BoxFit.cover),
+                 ),
+             ),
+             const SizedBox(height: 12),
+             
+             if (paymentStatus != null)
+                 _buildInfoRow('Status', paymentStatus.toUpperCase()),
+
+             if (paymentStatus == 'pending_verification' || (paymentStatus == 'review')) ...[
+                 const SizedBox(height: 16),
+                 Row(
+                     children: [
+                         Expanded(
+                             child: ElevatedButton(
+                                 onPressed: _isProcessing ? null : _rejectPaymentProof,
+                                 style: ElevatedButton.styleFrom(
+                                     backgroundColor: Colors.red,
+                                     foregroundColor: Colors.white,
+                                 ),
+                                 child: const Text('Reject Payment'),
+                             ),
+                         ),
+                         const SizedBox(width: 16),
+                         Expanded(
+                             child: ElevatedButton(
+                                 onPressed: _isProcessing ? null : _verifyPayment,
+                                 style: ElevatedButton.styleFrom(
+                                     backgroundColor: Colors.green,
+                                     foregroundColor: Colors.white,
+                                 ),
+                                 child: const Text('Accept Payment'),
+                             ),
+                         ),
+                     ],
+                 ),
+             ] else if (paymentStatus == 'verified') ...[
+                 const SizedBox(height: 12),
+                 Container(
+                     padding: const EdgeInsets.all(12),
+                     decoration: BoxDecoration(color: Colors.green[100], borderRadius: BorderRadius.circular(8)),
+                     child: const Row(
+                         children: [
+                             Icon(Icons.check_circle, color: Colors.green),
+                             SizedBox(width: 8),
+                             Text("Payment Verified", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                         ],
+                     ),
+                 ),
+             ],
+          ],
+      );
+  }
     }
 
-    return _buildSection(
-      'Payment Verification',
-      [
-        const Text('Proof of Payment:', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        GestureDetector(
-            onTap: () {
-                showDialog(
-                    context: context,
-                    builder: (_) => Dialog(
-                        child: InteractiveViewer(
-                            child: Image.network(proofUrl),
-                        ),
-                    ),
-                );
-            },
-            child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(proofUrl, height: 200, width: double.infinity, fit: BoxFit.cover),
-            ),
-        ),
-        const SizedBox(height: 12),
-        if (paymentStatus != null)
-             _buildInfoRow('Status', paymentStatus.toUpperCase()),
-             
-        if (paymentStatus == 'review' || paymentStatus == 'pending' || paymentStatus == null) ...[
-            const SizedBox(height: 16),
-            Row(
-                children: [
-                    Expanded(
-                        child: ElevatedButton(
-                            onPressed: _isProcessing ? null : _rejectPaymentProof,
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                            ),
-                            child: const Text('Reject Payment'),
-                        ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                         child: ElevatedButton(
-                            onPressed: _isProcessing ? null : _verifyPayment,
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                            ),
-                            child: const Text('Verify Payment'),
-                         ),
-                    ),
-                ],
-            ),
-        ],
-      ],
-    );
-  }
-}

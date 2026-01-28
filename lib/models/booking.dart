@@ -77,6 +77,8 @@ class Booking {
   final String? paymentStatus; // 'pending', 'review', 'verified', 'rejected'
   final DateTime? paymentUploadedAt;
   final DateTime? paymentVerifiedAt;
+  final String? landlordMessage;
+  final DateTime? paymentSubmittedAt;
 
   Booking({
     this.id,
@@ -109,6 +111,8 @@ class Booking {
     this.paymentStatus,
     this.paymentUploadedAt,
     this.paymentVerifiedAt,
+    this.landlordMessage,
+    this.paymentSubmittedAt,
   });
 
   /// Convert to Firestore document
@@ -143,6 +147,8 @@ class Booking {
       'paymentStatus': paymentStatus,
       'paymentUploadedAt': paymentUploadedAt != null ? Timestamp.fromDate(paymentUploadedAt!) : null,
       'paymentVerifiedAt': paymentVerifiedAt != null ? Timestamp.fromDate(paymentVerifiedAt!) : null,
+      'landlordMessage': landlordMessage,
+      'paymentSubmittedAt': paymentSubmittedAt != null ? Timestamp.fromDate(paymentSubmittedAt!) : null,
     };
   }
 
@@ -190,6 +196,10 @@ class Booking {
       paymentVerifiedAt: data['paymentVerifiedAt'] != null 
           ? (data['paymentVerifiedAt'] as Timestamp).toDate() 
           : null,
+      landlordMessage: data['landlordMessage'] as String?,
+      paymentSubmittedAt: data['paymentSubmittedAt'] != null 
+          ? (data['paymentSubmittedAt'] as Timestamp).toDate() 
+          : null,
     );
   }
 
@@ -225,6 +235,8 @@ class Booking {
     String? paymentStatus,
     DateTime? paymentUploadedAt,
     DateTime? paymentVerifiedAt,
+    String? landlordMessage,
+    DateTime? paymentSubmittedAt,
   }) {
     return Booking(
       id: id ?? this.id,
@@ -257,6 +269,8 @@ class Booking {
       paymentStatus: paymentStatus ?? this.paymentStatus,
       paymentUploadedAt: paymentUploadedAt ?? this.paymentUploadedAt,
       paymentVerifiedAt: paymentVerifiedAt ?? this.paymentVerifiedAt,
+      landlordMessage: landlordMessage ?? this.landlordMessage,
+      paymentSubmittedAt: paymentSubmittedAt ?? this.paymentSubmittedAt,
     );
   }
 

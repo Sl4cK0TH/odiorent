@@ -68,6 +68,9 @@ class Property {
   // New: Location coordinates (Phase 2)
   final double? latitude;
   final double? longitude;
+  
+  // New: BIR Permit (from Landlord profile)
+  final String? birPermitUrl;
 
   // --- Constructor ---
   Property({
@@ -96,6 +99,7 @@ class Property {
     this.ratingCount = 0, // New
     this.latitude, // New
     this.longitude, // New
+    this.birPermitUrl, // New
   });
 
   /// --- `toJson` Method ---
@@ -116,6 +120,7 @@ class Property {
       'approved_at': approvedAt?.toIso8601String(),
       'latitude': latitude, // New
       'longitude': longitude, // New
+      'birPermitUrl': birPermitUrl, // New
     };
   }
 
@@ -149,6 +154,7 @@ class Property {
       ratingCount: json['rating_count'] as int? ?? 0,
       latitude: (json['latitude'] as num?)?.toDouble(), // New
       longitude: (json['longitude'] as num?)?.toDouble(), // New
+      birPermitUrl: json['birPermitUrl'] as String?, // New
     );
   }
 
@@ -172,6 +178,7 @@ class Property {
       'ratingCount': ratingCount,
       'latitude': latitude, // New
       'longitude': longitude, // New
+      'birPermitUrl': birPermitUrl, // New
     };
   }
 
@@ -197,6 +204,7 @@ class Property {
       ratingCount: data['ratingCount'] as int? ?? 0,
       latitude: (data['latitude'] as num?)?.toDouble(), // New
       longitude: (data['longitude'] as num?)?.toDouble(), // New
+      birPermitUrl: data['birPermitUrl'] as String?, // New
     );
   }
 
@@ -227,6 +235,7 @@ class Property {
     int? ratingCount,
     double? latitude, // New
     double? longitude, // New
+    String? birPermitUrl, // New
   }) {
     return Property(
       id: id ?? this.id,
@@ -254,6 +263,7 @@ class Property {
       ratingCount: ratingCount ?? this.ratingCount,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      birPermitUrl: birPermitUrl ?? this.birPermitUrl,
     );
   }
 }

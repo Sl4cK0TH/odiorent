@@ -14,6 +14,18 @@ class FirebaseDatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final CloudinaryService _cloudinary = CloudinaryService();
 
+  // ========== USER OPERATIONS ==========
+
+  Future<Map<String, dynamic>?> getUserById(String userId) async {
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+      return doc.data();
+    } catch (e) {
+      debugPrint("Error fetching user: $e");
+      return null;
+    }
+  }
+
   // ========== PROPERTY CRUD OPERATIONS ==========
 
   /// --- CREATE PROPERTY ---
@@ -31,9 +43,25 @@ class FirebaseDatabaseService {
         throw Exception('A property with the same name already exists.');
       }
 
+      // Fetch Landlord Profile to get BIR Permit URL
+      String? birPermitUrl;
+      try {
+        final userDoc = await _firestore.collection('users').doc(property.landlordId).get();
+        if (userDoc.exists) {
+            birPermitUrl = userDoc.data()?['birPermitUrl'] as String?;
+            if (birPermitUrl != null) {
+                debugPrint("📄 Attaching BIR Permit to Property: $birPermitUrl");
+            } else {
+                debugPrint("⚠️ No BIR Permit found for Landlord ${property.landlordId}");
+            }
+        }
+      } catch (e) {
+         debugPrint("⚠️ Failed to fetch Landlord BIR Permit: $e");
+      }
+
       // Create property document
       final docRef = await _firestore.collection('properties').add(
-            property.toFirestore()
+            property.copyWith(birPermitUrl: birPermitUrl).toFirestore()
               ..['createdAt'] = FieldValue.serverTimestamp()
               ..['averageRating'] = 0.0
               ..['ratingCount'] = 0,
@@ -1330,10 +1358,32 @@ class FirebaseDatabaseService {
         moveInDate.month + durationMonths,
         moveInDate.day,
       );
-      final totalAmount = (monthlyRent * durationMonths) + securityDeposit;
+      // Security deposit is 50% of 1 month's rent (Downpayment)
+      final calculatedSecurityDeposit = monthlyRent * 0.5;
+      final totalAmount = (monthlyRent * durationMonths) + calculatedSecurityDeposit;
 
-      // Check if property has reached maximum bookings (5 for testing)
-      const maxBookings = 5;
+      // Dynamic Occupancy Check
+      final propertyDoc = await _firestore.collection('properties').doc(propertyId).get();
+      if (!propertyDoc.exists) throw Exception('Property not found');
+      
+      final propertyData = propertyDoc.data()!;
+      final propertyType = propertyData['type'] as String? ?? 'Apartment';
+      final bedrooms = propertyData['bedrooms'] as int? ?? 1;
+      
+      // Determine Max Bookings (Capacity)
+      int maxBookings = 1; // Default for 'Entire Place'
+      
+      // If listing is a 'Room' or 'Boarding House', capacity is based on rooms/beds
+      // Assuming 'bedrooms' reflects distinct bookable units for Room listings
+      // If it's a shared room, maybe 'numberOfOccupants' capacity? 
+      // For simplicity and per user request: "set rooms and beds already occupied"
+      // If type implies multi-tenant:
+      if (propertyType.toLowerCase().contains('room') || 
+          propertyType.toLowerCase().contains('boarding') ||
+          propertyType.toLowerCase().contains('dorm')) {
+          maxBookings = bedrooms > 0 ? bedrooms : 1; 
+      }
+      
       final existingBookings = await _firestore
           .collection('bookings')
           .where('propertyId', isEqualTo: propertyId)
@@ -1341,8 +1391,8 @@ class FirebaseDatabaseService {
           .get();
 
       if (existingBookings.docs.length >= maxBookings) {
-        debugPrint("❌ Booking blocked: Property has reached maximum bookings ($maxBookings)");
-        throw Exception('Property has reached maximum bookings ($maxBookings). Please contact the landlord.');
+        debugPrint("❌ Booking blocked: Property is fully booked ($maxBookings/$maxBookings)");
+        throw Exception('This property is fully booked. Please try another property or contact the landlord.');
       }
       
       debugPrint("✅ Property available: ${existingBookings.docs.length}/$maxBookings bookings");
@@ -1364,7 +1414,7 @@ class FirebaseDatabaseService {
         'numberOfOccupants': numberOfOccupants,
         'specialRequests': specialRequests,
         'monthlyRent': monthlyRent,
-        'securityDeposit': securityDeposit,
+        'securityDeposit': calculatedSecurityDeposit,
         'totalAmount': totalAmount,
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
@@ -1587,40 +1637,68 @@ class FirebaseDatabaseService {
 
       await _firestore.collection('bookings').doc(bookingId).update({
         'proofOfPaymentUrl': imageUrl,
-        'paymentStatus': 'review',
         'paymentUploadedAt': FieldValue.serverTimestamp(),
+        // Status updates happen on "Notify Landlord" action
       });
       
       debugPrint("✅ Payment proof uploaded successfully");
-      
-      // Notify landlord
-      final bookingDoc = await _firestore.collection('bookings').doc(bookingId).get();
-      if (bookingDoc.exists) {
-        final data = bookingDoc.data()!;
-        final landlordId = data['landlordId'] as String;
-        final renterName = data['renterName'] as String? ?? 'Renter';
-        
-        await PushNotificationService().sendBookingNotification(
-          userId: landlordId,
-          title: 'Payment Uploaded 💰',
-          body: '$renterName has uploaded proof of payment. Please verify.',
-          bookingId: bookingId,
-          status: 'payment_review',
-        );
-      }
     } catch (e) {
       debugPrint("❌ Error uploading proof of payment: $e");
       rethrow;
     }
   }
 
-  /// Verify payment
-  Future<void> verifyPayment(String bookingId) async {
+  /// Submit payment proof (Notify Landlord)
+  Future<void> submitPaymentProof(String bookingId) async {
     try {
       await _firestore.collection('bookings').doc(bookingId).update({
+        'paymentStatus': 'pending_verification',
+        'paymentSubmittedAt': FieldValue.serverTimestamp(),
+      });
+      
+      debugPrint("✅ Payment proof submitted for review: $bookingId");
+      
+      // Notify landlord
+      final bookingDoc = await _firestore.collection('bookings').doc(bookingId).get();
+      if (bookingDoc.exists) {
+        final data = bookingDoc.data()!;
+        final landlordId = data['landlordId'] as String;
+        final renterName = data['renterName'] as String?;
+        
+        await PushNotificationService().sendBookingNotification(
+          userId: landlordId,
+          title: 'Payment Submitted 💰',
+          body: '${renterName ?? "Renter"} has submitted proof of payment.',
+          bookingId: bookingId,
+          status: 'payment_submitted',
+        );
+      }
+    } catch (e) {
+      debugPrint("❌ Error submitting payment proof: $e");
+      rethrow;
+    }
+  }
+
+  /// Verify payment
+  Future<void> verifyPayment(String bookingId, {String? message}) async {
+    try {
+      final updates = <String, dynamic>{
         'paymentStatus': 'verified',
         'paymentVerifiedAt': FieldValue.serverTimestamp(),
-      });
+        // Optionally move to 'active' or just keep 'approved' but marked as verified?
+        // Prompt says "Booking Verified" at bottom.
+        // Let's keep status as 'approved' (or 'active' if we treat deposit as activation)
+        // Actually, if we reject, we set status='rejected'. so verify probably should seal it.
+        // Let's keeping status as 'approved' but paymentStatus='verified' is robust enough.
+        // But prompt says "remove Cancel Booking".
+        // Let's update `landlordMessage`
+      };
+      
+      if (message != null) {
+        updates['landlordMessage'] = message;
+      }
+
+      await _firestore.collection('bookings').doc(bookingId).update(updates);
       
       debugPrint("✅ Payment verified for booking $bookingId");
       
@@ -1633,7 +1711,7 @@ class FirebaseDatabaseService {
         await PushNotificationService().sendBookingNotification(
           userId: renterId,
           title: 'Payment Verified! ✅',
-          body: 'Your payment has been verified by the landlord.',
+          body: 'Your payment has been verified. ${message ?? ""}',
           bookingId: bookingId,
           status: 'payment_verified',
         );
@@ -1649,9 +1727,9 @@ class FirebaseDatabaseService {
     try {
       await _firestore.collection('bookings').doc(bookingId).update({
         'paymentStatus': 'rejected',
-        'rejectionReason': reason, // Re-use rejectionReason or add new field? re-using for now or using generic.
-        // Actually better to not overwrite main rejectionReason if booking is still valid.
-        // Let's assume we handle it in UI/Model by context.
+        'status': 'rejected', // Explicitly reject the whole booking
+        'rejectionReason': reason,
+        'rejectedAt': FieldValue.serverTimestamp(),
       });
       
       debugPrint("✅ Payment rejected for booking $bookingId");
@@ -1697,6 +1775,22 @@ class FirebaseDatabaseService {
             status: 'cancelled',
             cancellationReason: 'Auto-cancelled due to timeout (24h limit).',
           ).catchError((e) => debugPrint("Error auto-cancelling: $e"));
+        }
+      } else if (status == 'approved') {
+        // Check for 24h payment deadline
+        final approvedAtRaw = data['approvedAt'];
+        final paymentStatus = data['paymentStatus'] as String?;
+        
+        if (approvedAtRaw != null && paymentStatus != 'pending_verification' && paymentStatus != 'verified') {
+           final approvedAt = (approvedAtRaw as Timestamp).toDate();
+           if (approvedAt.isBefore(threshold)) {
+              debugPrint("⏰ Auto-cancelling approved booking due to non-payment: ${doc.id}");
+              updateBookingStatus(
+                bookingId: doc.id,
+                status: 'cancelled',
+                cancellationReason: 'Cancelled: Failed to pay downpayment within 24 hours.',
+              ).catchError((e) => debugPrint("Error auto-cancelling payment: $e"));
+           }
         }
       }
     }
@@ -1967,7 +2061,25 @@ class FirebaseDatabaseService {
     String? excludeBookingId, // For when editing a booking
   }) async {
     try {
-      const maxBookings = 5; // Maximum concurrent bookings allowed (for testing)
+      // Dynamic Occupancy Logic (duplicated from createBooking)
+      final propertyDoc = await _firestore.collection('properties').doc(propertyId).get();
+      if (!propertyDoc.exists) {
+          debugPrint("❌ Property not found during availability check");
+          return false;
+      }
+      
+      final propertyData = propertyDoc.data()!;
+      final propertyType = propertyData['type'] as String? ?? 'Apartment';
+      final bedrooms = propertyData['bedrooms'] as int? ?? 1;
+      
+      int maxBookings = 1; 
+      if (propertyType.toLowerCase().contains('room') || 
+          propertyType.toLowerCase().contains('boarding') ||
+          propertyType.toLowerCase().contains('dorm')) {
+          maxBookings = bedrooms > 0 ? bedrooms : 1; 
+      }
+      
+      // const maxBookings = 5; // Removed hardcoded value
       
       debugPrint("🔍 Checking availability for property $propertyId");
       debugPrint("   Requested: ${DateFormat('MMM dd, yyyy').format(moveInDate)} to ${DateFormat('MMM dd, yyyy').format(moveOutDate)}");
@@ -1996,6 +2108,51 @@ class FirebaseDatabaseService {
       return true; // Property is available
     } catch (e) {
       debugPrint("❌ Error checking property availability: $e");
+      return false;
+    }
+  }
+
+  /// Check if property is currently fully booked (ignoring specific dates, just capacity)
+  Future<bool> isPropertyFull(String propertyId) async {
+    try {
+      // Fetch Property for capacity
+      final propertyDoc = await _firestore.collection('properties').doc(propertyId).get();
+      if (!propertyDoc.exists) return false;
+      
+      final propertyData = propertyDoc.data()!;
+      final propertyType = propertyData['type'] as String? ?? 'Apartment';
+      final bedrooms = propertyData['bedrooms'] as int? ?? 1;
+      
+      int capacity = 1; 
+      if (propertyType.toLowerCase().contains('room') || 
+          propertyType.toLowerCase().contains('boarding') ||
+          propertyType.toLowerCase().contains('dorm')) {
+          capacity = bedrooms > 0 ? bedrooms : 1; 
+          // If property type implies "per bed", use beds count if bedrooms is just room count?
+          // User said "set rooms and beds are already occupied".
+          // If bedrooms=5, beds=10. Capacity should probably be BEDS if it's a Boarding House.
+          // Let's check 'beds'. If beds > bedrooms, use beds.
+          final beds = propertyData['beds'] as int? ?? 0;
+          if (beds > capacity) capacity = beds;
+      }
+      
+      // Count active/approved bookings
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('propertyId', isEqualTo: propertyId)
+          .where('status', whereIn: ['approved', 'active'])
+          .get();
+
+      // We sum up occupants incase 1 booking = 1 person
+      int currentOccupants = 0;
+      for (var doc in snapshot.docs) {
+          final data = doc.data();
+          currentOccupants += (data['numberOfOccupants'] as int? ?? 1);
+      }
+
+      return currentOccupants >= capacity;
+    } catch (e) {
+      debugPrint("Error checking if property is full: $e");
       return false;
     }
   }

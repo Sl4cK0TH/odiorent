@@ -552,6 +552,35 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                   ),
                   const SizedBox(height: 24),
 
+                  // --- Availability Status ---
+                  if (!_isLoadingAvailability && _availableBeds == 0) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        border: Border.all(color: Colors.red),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.red),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'This property is fully booked.',
+                              style: TextStyle(
+                                color: Colors.red.shade900,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
                   // --- Description ---
                   const Text(
                     'Description',
@@ -643,6 +672,38 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                     'Contact Number',
                     property.landlordPhoneNumber ?? 'N/A',
                   ),
+                  
+                  // --- BIR Permit Display ---
+                  if (property.birPermitUrl != null && property.birPermitUrl!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                          "Verified BIR Permit",
+                          style: TextStyle(
+                              fontSize: 14, 
+                              fontWeight: FontWeight.bold, 
+                              color: Color(0xFF388E3C), // Dark Green
+                          ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 200,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                                property.birPermitUrl!,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) => const Center(
+                                    child: Text("Could not load permit image"),
+                                ),
+                            ),
+                        ),
+                      ),
+                  ],
                   if (_isFetchingDetails)
                     const Padding(
                       padding: EdgeInsets.only(top: 12.0),

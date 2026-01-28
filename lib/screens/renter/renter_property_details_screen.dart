@@ -136,7 +136,38 @@ class _RenterPropertyDetailsScreenState
                           Text('Email: ${landlord.email}', style: const TextStyle(fontSize: 16)),
                           const SizedBox(height: 4),
                           Text('Contact: ${landlord.phoneNumber}', style: const TextStyle(fontSize: 16)),
-                          // TODO: Add landlord profile picture later
+                          
+                          // --- BIR Permit Display ---
+                          if (property.birPermitUrl != null && property.birPermitUrl!.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              const Text(
+                                  "Verified BIR Permit",
+                                  style: TextStyle(
+                                      fontSize: 14, 
+                                      fontWeight: FontWeight.bold, 
+                                      color: Color(0xFF388E3C), // Dark Green
+                                  ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                height: 200,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade300),
+                                    borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                        property.birPermitUrl!,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (context, error, stackTrace) => const Center(
+                                            child: Text("Could not load permit image"),
+                                        ),
+                                    ),
+                                ),
+                              ),
+                          ],
                         ],
                       ),
                     ),

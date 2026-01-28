@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 
 class LocationPicker extends StatefulWidget {
   final double initialLat;
@@ -21,11 +22,95 @@ class LocationPicker extends StatefulWidget {
 class _LocationPickerState extends State<LocationPicker> {
   late LatLng _currentLocation;
   final MapController _mapController = MapController();
+  bool _isLoadingLocation = false;
 
   @override
   void initState() {
     super.initState();
     _currentLocation = LatLng(widget.initialLat, widget.initialLng);
+  }
+
+  Future<void> _determinePosition() async {
+    setState(() {
+      _isLoadingLocation = true;
+    });
+
+    try {
+      bool serviceEnabled;
+      LocationPermission permission;
+
+      // Test if location services are enabled.
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Location services are disabled. Please enable GPS.')),
+           );
+        }
+        return;
+      }
+
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Location permissions are denied')),
+            );
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                    content: const Text('Location permissions are permanently denied.'),
+                    action: SnackBarAction(
+                        label: 'Open Settings',
+                        onPressed: () => Geolocator.openAppSettings(),
+                    ),
+                ),
+            );
+        }
+        return;
+      } 
+
+      // When we reach here, permissions are granted and we can
+      // continue accessing the position of the device.
+      Position position = await Geolocator.getCurrentPosition();
+      
+      final newLocation = LatLng(position.latitude, position.longitude);
+      
+      setState(() {
+        _currentLocation = newLocation;
+      });
+      
+      _mapController.move(newLocation, 15.0);
+      widget.onLocationPicked(position.latitude, position.longitude);
+      
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(content: Text('Location updated to current GPS position!')),
+         );
+      }
+
+    } catch (e) {
+       debugPrint("Error getting location: $e");
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text('Error getting location: $e')),
+         );
+       }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+        });
+      }
+    }
   }
 
   @override
@@ -78,10 +163,10 @@ class _LocationPickerState extends State<LocationPicker> {
               right: 10,
               child: FloatingActionButton(
                 mini: true,
-                onPressed: () {
-                  _mapController.move(_currentLocation, 15.0);
-                },
-                child: const Icon(Icons.my_location),
+                onPressed: _isLoadingLocation ? null : _determinePosition,
+                child: _isLoadingLocation 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.my_location),
               ),
             ),
             Container(

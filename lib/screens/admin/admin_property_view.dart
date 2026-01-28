@@ -191,6 +191,42 @@ class _AdminPropertyViewScreenState extends State<AdminPropertyViewScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // --- BIR Permit (Admin View) ---
+                  if (widget.property.birPermitUrl != null && 
+                      widget.property.birPermitUrl!.isNotEmpty) ...[
+                      const Text(
+                        'BIR Permit',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: () {
+                          // TODO: Open full screen image if needed
+                        },
+                        child: Container(
+                            height: 250,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                    widget.property.birPermitUrl!,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (context, error, stackTrace) => const Center(
+                                        child: Text("Failed to load BIR Permit"),
+                                    ),
+                                ),
+                            ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                   ],
 
                   const SizedBox(height: 8),

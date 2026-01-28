@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,6 +20,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   final _dbService = FirebaseDatabaseService();
   bool _isCancelling = false;
   bool _isUploadingPayment = false;
+  bool _isNotifying = false;
+  
+
 
   Future<void> _pickAndUploadPayment() async {
     final picker = ImagePicker();
@@ -78,6 +83,27 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         }
       }
     }
+  }
+
+  Future<void> _notifyLandlord() async {
+      setState(() => _isNotifying = true);
+      try {
+          await _dbService.submitPaymentProof(widget.bookingId);
+          if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Landlord notified successfully!')),
+              );
+              setState(() {}); // Refresh UI
+          }
+      } catch (e) {
+          if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error notifying landlord: $e'), backgroundColor: Colors.red),
+              );
+          }
+      } finally {
+          if (mounted) setState(() => _isNotifying = false);
+      }
   }
 
   Future<void> _showCancelDialog(Map<String, dynamic> bookingData) async {
@@ -242,11 +268,64 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                           color: statusColor,
                         ),
                       ),
+                      if (bookingData['landlordMessage'] != null && (status == BookingStatus.active || status == BookingStatus.approved)) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            "Message: ${bookingData['landlordMessage']}",
+                             style: const TextStyle(fontStyle: FontStyle.italic),
+                             textAlign: TextAlign.center,
+                          ),
+                      ],
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                
+                // 24-Hour Countdown Timer
+                if (status == BookingStatus.approved && 
+                    bookingData['paymentStatus'] != 'pending_verification' && 
+                    bookingData['paymentStatus'] != 'verified') ...[
+                    const SizedBox(height: 24),
+                    if (bookingData['approvedAt'] != null)
+                      CountdownWidget(
+                        deadline: (bookingData['approvedAt'] as Timestamp)
+                            .toDate()
+                            .add(const Duration(hours: 24)),
+                      ),
+                ],
 
+                // Verified / Rejected Banners
+                if (bookingData['paymentStatus'] == 'verified') ...[
+                    const SizedBox(height: 24),
+                    Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                            color: Colors.green,
+                            borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Column(
+                            children: [
+                                Icon(Icons.verified, color: Colors.white, size: 40),
+                                SizedBox(height: 8),
+                                Text(
+                                    "BOOKING VERIFIED",
+                                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                ),
+                            ],
+                        ),
+                    ),
+                ],
+                
+                if (bookingData['status'] == 'rejected') ...[ // Using string check or enum? enum is better but raw data is map.
+                     // The status Banner already handles "Rejected" visually.
+                     // But user asked for "below it is the reason why...".
+                     // Existing code already has "Rejection Reason" section at bottom.
+                     // User said: "Booking Rejected then below it is the reason".
+                     // Let's ensure THAT section is prominent.
+                ],
+
+                const SizedBox(height: 24),
+                
                 // Property Information
                 _buildSection(
                   'Property Information',
@@ -526,43 +605,216 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       if (status != 'approved' && status != 'active' && proofUrl == null) {
           return const SizedBox.shrink();
       }
+      
+      final bool canEdit = paymentStatus != 'pending_verification' && paymentStatus != 'verified' && paymentStatus != 'rejected';
+      final bool isSubmitted = paymentStatus == 'pending_verification';
 
       return _buildSection(
           'Payment Information',
           [
               if (proofUrl != null) ...[
-                 const Text('Proof of Payment:', style: TextStyle(fontWeight: FontWeight.bold)),
+                 Row(
+                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                   children: [
+                     const Text('Proof of Payment:', style: TextStyle(fontWeight: FontWeight.bold)),
+                     if (canEdit)
+                        TextButton.icon(
+                            onPressed: _pickAndUploadPayment, 
+                            icon: const Icon(Icons.edit, size: 16),
+                            label: const Text("Change"),
+                        ),
+                   ],
+                 ),
                  const SizedBox(height: 8),
-                 ClipRRect(
-                     borderRadius: BorderRadius.circular(8),
-                     child: Image.network(proofUrl, height: 200, width: double.infinity, fit: BoxFit.cover),
+                 InkWell(
+                     onTap: canEdit ? _pickAndUploadPayment : null,
+                     child: ClipRRect(
+                         borderRadius: BorderRadius.circular(8),
+                         child: Stack(
+                           alignment: Alignment.center,
+                           children: [
+                             Image.network(proofUrl, height: 200, width: double.infinity, fit: BoxFit.cover),
+                             if (canEdit)
+                               Container(
+                                 color: Colors.black38,
+                                 padding: const EdgeInsets.all(8),
+                                 child: const Icon(Icons.camera_alt, color: Colors.white),
+                               ),
+                           ],
+                         ),
+                     ),
                  ),
                  const SizedBox(height: 12),
               ],
               
               if (paymentStatus != null)
-                 _buildInfoRow('Payment Status', paymentStatus.toUpperCase()),
+                 _buildInfoRow('Payment Status', 
+                     paymentStatus == 'pending_verification' ? 'UNDER REVIEW' : paymentStatus.toUpperCase()
+                 ),
                  
-              if (status == 'approved' && paymentStatus != 'verified') ...[
+              if (status == 'approved') ...[
                  const SizedBox(height: 16),
-                 SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                        icon: const Icon(Icons.upload_file),
-                        label: Text(_isUploadingPayment ? 'Uploading...' : 'Upload Proof of Payment'),
-                        onPressed: _isUploadingPayment ? null : _pickAndUploadPayment,
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                 
+                 // Upload Button (only if no proof yet)
+                 if (proofUrl == null)
+                     SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                            icon: const Icon(Icons.upload_file),
+                            label: Text(_isUploadingPayment ? 'Uploading...' : 'Upload Proof of Payment'),
+                            onPressed: _isUploadingPayment ? null : _pickAndUploadPayment,
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                             ),
                         ),
-                    ),
-                 ),
+                     ),
+                     
+                  // Notify Landlord Button (only if proof exists and not submitted)
+                  if (proofUrl != null && !isSubmitted && paymentStatus != 'verified')
+                     SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                            icon: const Icon(Icons.notifications_active),
+                            label: Text(_isNotifying ? 'Notifying...' : 'Notify Landlord'),
+                            onPressed: _isNotifying ? null : _notifyLandlord,
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF4CAF50),
+                                foregroundColor: Colors.white,
+                                elevation: 4,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                            ),
+                        ),
+                     ),
+                     
+                   if (isSubmitted)
+                      Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                              color: Colors.blue.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.blue),
+                          ),
+                          child: const Column(
+                              children: [
+                                  Icon(Icons.hourglass_top, color: Colors.blue),
+                                  SizedBox(height: 4),
+                                  Text("Payment submitted. Waiting for landlord verification.", 
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)
+                                  ),
+                              ],
+                          ),
+                      ),
               ],
           ],
+      );
+  }
+}
+
+class CountdownWidget extends StatefulWidget {
+  final DateTime deadline;
+  const CountdownWidget({super.key, required this.deadline});
+
+  @override
+  State<CountdownWidget> createState() => _CountdownWidgetState();
+}
+
+class _CountdownWidgetState extends State<CountdownWidget> {
+  late Timer _timer;
+  Duration _remaining = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _calculateRemaining();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+       _calculateRemaining();
+    });
+  }
+
+  void _calculateRemaining() {
+      final now = DateTime.now();
+      final diff = widget.deadline.difference(now);
+      if (mounted) {
+          setState(() {
+              _remaining = diff;
+          });
+      }
+      if (diff.isNegative) {
+          _timer.cancel();
+      }
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+      if (_remaining.isNegative) {
+          return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red),
+              ),
+              child: const Text(
+                  "Deadline Exceeded - Booking will be cancelled shortly.",
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+              ),
+          );
+      }
+
+      final hours = _remaining.inHours;
+      final minutes = _remaining.inMinutes % 60;
+      final seconds = _remaining.inSeconds % 60;
+
+      return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+              color: Colors.orange.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange, width: 2),
+          ),
+          child: Column(
+              children: [
+                  const Text(
+                      "Time remaining to pay deposit:",
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                      "${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}",
+                      style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                          fontFamily: 'Courier',
+                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                      "Booking will constitute as cancelled if deposit is not paid within 24 hours.",
+                      style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                      textAlign: TextAlign.center,
+                  ),
+              ],
+          ),
       );
   }
 }
