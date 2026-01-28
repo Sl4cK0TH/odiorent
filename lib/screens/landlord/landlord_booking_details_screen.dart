@@ -504,6 +504,8 @@ class _LandlordBookingDetailsScreenState extends State<LandlordBookingDetailsScr
                         ),
                       ),
                     _buildInfoRow('Name', bookingData['propertyName'] ?? 'N/A'),
+                    if (bookingData['roomName'] != null)
+                      _buildInfoRow('Room / Unit', bookingData['roomName']),
                     _buildInfoRow('Address', bookingData['propertyAddress'] ?? 'N/A'),
                     _buildInfoRow(
                       'Monthly Rent',

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_map/flutter_map.dart'; // Import flutter_map
 import 'package:latlong2/latlong.dart'; // Import latlong2
 import 'package:odiorent/models/property.dart';
+import 'package:odiorent/models/property_room.dart'; // New
 import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:odiorent/screens/shared/chat_room_screen.dart';
@@ -35,6 +36,11 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
   // Availability Logic
   int _availableBeds = 0;
   bool _isLoadingAvailability = true;
+  
+  // Room Logic
+  List<PropertyRoom> _rooms = [];
+  bool _isLoadingRooms = true;
+  Map<String, int> _roomOccupancy = {}; // New
 
   @override
   void initState() {
@@ -44,6 +50,25 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
     _fetchPropertyDetails();
     _checkBookmarkStatus();
     _fetchAvailability();
+    _fetchRooms();
+  }
+
+  Future<void> _fetchRooms() async {
+    if (_property.id == null) return;
+    try {
+      final rooms = await _dbService.getRoomsForProperty(_property.id!);
+      if (mounted) {
+        setState(() {
+          _rooms = rooms;
+          _isLoadingRooms = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching rooms: $e");
+      if (mounted) {
+        setState(() => _isLoadingRooms = false);
+      }
+    }
   }
 
   Future<void> _fetchAvailability() async {
@@ -51,14 +76,18 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
     try {
       final activeBookings = await _dbService.getActiveBookingsByProperty(_property.id!);
       
-      // Calculate occupied beds (assuming 1 booking = 1 bed for now, or use numberOfOccupants if applicable)
-      // The logic here depends on whether 'bookings' reserve the whole unit or just beds.
-      // Based on the 'beds' field, it implies individual bed rentals or just property capacity.
-      // Let's assume for this logic that 1 booking = 1 active occupancy unless specified otherwise.
       int occupiedCount = 0;
+      final Map<String, int> roomOcc = {};
+
       for (var booking in activeBookings) {
           // If booking has 'numberOfOccupants', use that, otherwise count as 1
-          occupiedCount += (booking['numberOfOccupants'] as int? ?? 1);
+          final count = (booking['numberOfOccupants'] as int? ?? 1);
+          occupiedCount += count;
+          
+          final roomId = booking['roomId'] as String?;
+          if (roomId != null) {
+            roomOcc[roomId] = (roomOcc[roomId] ?? 0) + count;
+          }
       }
 
       final calculatedAvailable = _property.beds - occupiedCount;
@@ -66,6 +95,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
       if (mounted) {
         setState(() {
           _availableBeds = calculatedAvailable < 0 ? 0 : calculatedAvailable;
+          _roomOccupancy = roomOcc;
           _isLoadingAvailability = false;
         });
       }
@@ -150,7 +180,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
     }
   }
 
-  void _handleBookNow() async {
+  void _handleBookNow({PropertyRoom? room}) async {
     // Check if property status is approved
     if (_property.status != PropertyStatus.approved) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -162,8 +192,8 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
       return;
     }
     
-    // Check if fully booked
-    if (!_isLoadingAvailability && _availableBeds <= 0) {
+    // Check if fully booked (Global check only applies if no room selected or if global tracking used)
+    if (room == null && !_isLoadingAvailability && _availableBeds <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('This property is currently fully booked.'),
@@ -177,7 +207,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CreateBookingScreen(property: _property),
+        builder: (context) => CreateBookingScreen(property: _property, room: room),
       ),
     );
 
@@ -363,23 +393,26 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.calendar_today_outlined),
-                      label: const Text('Book Now'),
-                      onPressed: _availableBeds > 0 ? _handleBookNow : null, // Disable if full
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: _availableBeds > 0 ? primaryGreen : Colors.grey,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          side: BorderSide(color: _availableBeds > 0 ? primaryGreen : Colors.grey),
+                  // Only show generic "Book Now" if no specific rooms are defined
+                  if (_rooms.isEmpty && !_isLoadingRooms) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.calendar_today_outlined),
+                          label: const Text('Book Now'),
+                          onPressed: _availableBeds > 0 ? () => _handleBookNow() : null, // Disable if full
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: _availableBeds > 0 ? primaryGreen : Colors.grey,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                              side: BorderSide(color: _availableBeds > 0 ? primaryGreen : Colors.grey),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                  ],
                 ],
               ),
         ),
@@ -579,6 +612,94 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                  ],
+
+                  // --- Available Rooms ---
+                  if (_isLoadingRooms)
+                    const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
+                  else if (_rooms.isNotEmpty) ...[
+                      const Text(
+                        'Available Rooms / Units',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      ..._rooms.map((room) {
+                          final occupancy = _roomOccupancy[room.id] ?? 0;
+                          final available = room.capacity - occupancy;
+                          final isFull = available <= 0;
+                          
+                          return Card(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          elevation: 3,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                  if (room.imageUrls.isNotEmpty)
+                                     ClipRRect(
+                                        borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+                                        child: Image.network(
+                                            room.imageUrls.first,
+                                            height: 150,
+                                            width: double.infinity,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[300], height: 150, child: const Icon(Icons.broken_image)),
+                                        ),
+                                     ),
+                                  Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                              Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                      Expanded(child: Text(room.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                                                      const SizedBox(width: 8),
+                                                      Text("₱${room.price.toStringAsFixed(0)}/mo", style: const TextStyle(fontWeight: FontWeight.bold, color: primaryGreen, fontSize: 16)),
+                                                  ],
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                children: [
+                                                    Icon(Icons.bed, size: 16, color: isFull ? Colors.red : primaryGreen),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                        isFull ? "Fully Booked (${room.capacity} Beds)" : "Available: $available / ${room.capacity} Beds",
+                                                        style: TextStyle(
+                                                            color: isFull ? Colors.red : primaryGreen,
+                                                            fontWeight: FontWeight.w600,
+                                                        ),
+                                                    ),
+                                                ],
+                                              ),
+                                              if (room.description.isNotEmpty) ...[
+                                                  const SizedBox(height: 8),
+                                                  Text(room.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.grey[800])),
+                                              ],
+                                              const SizedBox(height: 12),
+                                              SizedBox(
+                                                  width: double.infinity,
+                                                  child: ElevatedButton(
+                                                      style: ElevatedButton.styleFrom(
+                                                          backgroundColor: isFull ? Colors.grey : primaryGreen,
+                                                          foregroundColor: Colors.white,
+                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                      ),
+                                                      onPressed: isFull ? null : () {
+                                                          _handleBookNow(room: room);
+                                                      },
+                                                      child: Text(isFull ? "Fully Booked" : "Book This Room"),
+                                                  ),
+                                              ),
+                                          ],
+                                      ),
+                                  ),
+                              ],
+                          ),
+                      );
+                      }),
+                      const SizedBox(height: 24),
                   ],
 
                   // --- Description ---

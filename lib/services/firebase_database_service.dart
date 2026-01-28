@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:odiorent/models/message.dart';
 import 'package:odiorent/models/property.dart';
+import 'package:odiorent/models/property_room.dart';
 import 'package:odiorent/services/cloudinary_service.dart';
 import 'package:odiorent/services/push_notification_service.dart';
 import 'package:path/path.dart' as p;
@@ -28,8 +29,70 @@ class FirebaseDatabaseService {
 
   // ========== PROPERTY CRUD OPERATIONS ==========
 
-  /// --- CREATE PROPERTY ---
-  Future<void> createProperty(Property property) async {
+  // ========== PROPERTY ROOM OPERATIONS (Granular Management) ==========
+
+  /// --- ADD ROOM TO PROPERTY ---
+  Future<String> addRoomToProperty(String propertyId, PropertyRoom room) async {
+    try {
+      final roomRef = await _firestore
+          .collection('properties')
+          .doc(propertyId)
+          .collection('rooms')
+          .add(room.toFirestore());
+      return roomRef.id;
+    } catch (e) {
+      debugPrint("❌ Error adding room: $e");
+      rethrow;
+    }
+  }
+
+  /// --- GET ROOMS FOR PROPERTY ---
+  Future<List<PropertyRoom>> getRoomsForProperty(String propertyId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('properties')
+          .doc(propertyId)
+          .collection('rooms')
+          .orderBy('createdAt', descending: false)
+          .get();
+
+      return snapshot.docs.map((doc) => PropertyRoom.fromFirestore(doc)).toList();
+    } catch (e) {
+      debugPrint("❌ Error getting rooms: $e");
+      return [];
+    }
+  }
+
+  /// --- UPDATE ROOM ---
+  Future<void> updateRoom(String propertyId, String roomId, PropertyRoom room) async {
+    try {
+      await _firestore
+          .collection('properties')
+          .doc(propertyId)
+          .collection('rooms')
+          .doc(roomId)
+          .update(room.toFirestore());
+    } catch (e) {
+      debugPrint("❌ Error updating room: $e");
+      rethrow;
+    }
+  }
+
+  /// --- DELETE ROOM ---
+  Future<void> deleteRoom(String propertyId, String roomId) async {
+    try {
+      await _firestore
+          .collection('properties')
+          .doc(propertyId)
+          .collection('rooms')
+          .doc(roomId)
+          .delete();
+    } catch (e) {
+      debugPrint("❌ Error deleting room: $e");
+      rethrow;
+    }
+  }
+  Future<String> createProperty(Property property) async {
     try {
       // Anti-duplication check
       final existingQuery = await _firestore
@@ -89,6 +152,8 @@ class FirebaseDatabaseService {
 
       await batch.commit();
       debugPrint("✅ Created ${adminsQuery.docs.length} notifications for admins");
+
+      return docRef.id;
     } catch (e) {
       debugPrint("❌ Error creating property: $e");
       rethrow;
@@ -1350,6 +1415,8 @@ class FirebaseDatabaseService {
     String? specialRequests,
     required double monthlyRent,
     required double securityDeposit,
+    String? roomId, // New
+    String? roomName, // New
   }) async {
     try {
       // Calculate move-out date and total amount
@@ -1362,40 +1429,19 @@ class FirebaseDatabaseService {
       final calculatedSecurityDeposit = monthlyRent * 0.5;
       final totalAmount = (monthlyRent * durationMonths) + calculatedSecurityDeposit;
 
-      // Dynamic Occupancy Check
-      final propertyDoc = await _firestore.collection('properties').doc(propertyId).get();
-      if (!propertyDoc.exists) throw Exception('Property not found');
-      
-      final propertyData = propertyDoc.data()!;
-      final propertyType = propertyData['type'] as String? ?? 'Apartment';
-      final bedrooms = propertyData['bedrooms'] as int? ?? 1;
-      
-      // Determine Max Bookings (Capacity)
-      int maxBookings = 1; // Default for 'Entire Place'
-      
-      // If listing is a 'Room' or 'Boarding House', capacity is based on rooms/beds
-      // Assuming 'bedrooms' reflects distinct bookable units for Room listings
-      // If it's a shared room, maybe 'numberOfOccupants' capacity? 
-      // For simplicity and per user request: "set rooms and beds already occupied"
-      // If type implies multi-tenant:
-      if (propertyType.toLowerCase().contains('room') || 
-          propertyType.toLowerCase().contains('boarding') ||
-          propertyType.toLowerCase().contains('dorm')) {
-          maxBookings = bedrooms > 0 ? bedrooms : 1; 
-      }
-      
-      final existingBookings = await _firestore
-          .collection('bookings')
-          .where('propertyId', isEqualTo: propertyId)
-          .where('status', whereIn: ['approved', 'active'])
-          .get();
+      // Centralized Availability Check (Global or Room-Specific)
+      final isAvailable = await isPropertyAvailable(
+        propertyId: propertyId,
+        moveInDate: moveInDate,
+        moveOutDate: moveOutDate,
+        roomId: roomId,
+      );
 
-      if (existingBookings.docs.length >= maxBookings) {
-        debugPrint("❌ Booking blocked: Property is fully booked ($maxBookings/$maxBookings)");
-        throw Exception('This property is fully booked. Please try another property or contact the landlord.');
+      if (!isAvailable) {
+         throw Exception('This property/room is fully booked or unavailable for the selected dates.');
       }
       
-      debugPrint("✅ Property available: ${existingBookings.docs.length}/$maxBookings bookings");
+      debugPrint("✅ Property/Room available. Creating booking...");
 
       final bookingData = {
         'propertyId': propertyId,
@@ -1418,6 +1464,8 @@ class FirebaseDatabaseService {
         'totalAmount': totalAmount,
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
+        'roomId': roomId, // New
+        'roomName': roomName, // New
       };
 
       final docRef = await _firestore.collection('bookings').add(bookingData);
@@ -2054,58 +2102,118 @@ class FirebaseDatabaseService {
   }
 
   /// Check if property is available for the given date range
+  /// Check if property (or specific room) is available
   Future<bool> isPropertyAvailable({
     required String propertyId,
     required DateTime moveInDate,
     required DateTime moveOutDate,
     String? excludeBookingId, // For when editing a booking
+    String? roomId, // NEW: Check specific room availability
   }) async {
     try {
-      // Dynamic Occupancy Logic (duplicated from createBooking)
-      final propertyDoc = await _firestore.collection('properties').doc(propertyId).get();
-      if (!propertyDoc.exists) {
-          debugPrint("❌ Property not found during availability check");
-          return false;
-      }
-      
-      final propertyData = propertyDoc.data()!;
-      final propertyType = propertyData['type'] as String? ?? 'Apartment';
-      final bedrooms = propertyData['bedrooms'] as int? ?? 1;
-      
-      int maxBookings = 1; 
-      if (propertyType.toLowerCase().contains('room') || 
-          propertyType.toLowerCase().contains('boarding') ||
-          propertyType.toLowerCase().contains('dorm')) {
-          maxBookings = bedrooms > 0 ? bedrooms : 1; 
-      }
-      
-      // const maxBookings = 5; // Removed hardcoded value
-      
-      debugPrint("🔍 Checking availability for property $propertyId");
-      debugPrint("   Requested: ${DateFormat('MMM dd, yyyy').format(moveInDate)} to ${DateFormat('MMM dd, yyyy').format(moveOutDate)}");
-      
-      final snapshot = await _firestore
-          .collection('bookings')
-          .where('propertyId', isEqualTo: propertyId)
-          .where('status', whereIn: ['approved', 'active'])
-          .get();
+      int maxCapacity = 0;
 
-      var bookingCount = snapshot.docs.length;
-      
-      // Exclude the booking being edited from the count
-      if (excludeBookingId != null) {
-        bookingCount = snapshot.docs.where((doc) => doc.id != excludeBookingId).length;
+      if (roomId != null) {
+        // --- ROOM-SPECIFIC CHECK ---
+        debugPrint("🔍 Checking availability for Room $roomId");
+        
+        final roomDoc = await _firestore
+            .collection('properties')
+            .doc(propertyId)
+            .collection('rooms')
+            .doc(roomId)
+            .get();
+            
+        if (!roomDoc.exists) {
+            debugPrint("❌ Room not found: $roomId");
+            return false;
+        }
+        
+        // Capacity of this specific room
+        maxCapacity = (roomDoc.data()?['capacity'] as int?) ?? 1;
+        debugPrint("   Room Capacity: $maxCapacity");
+
+        // Count active bookings for THIS ROOM
+        final snapshot = await _firestore
+            .collection('bookings')
+            .where('propertyId', isEqualTo: propertyId)
+            .where('roomId', isEqualTo: roomId) // Filter by Room
+            .where('status', whereIn: ['approved', 'active'])
+            .get(); // Note: Ideally filter by dates too, but for simplicty/MVP we assume full overlap or long-term leases
+            
+        // For long-term rentals (months), checking overlaps is complex. 
+        // Current logic assumes: if it's approved/active, it's occupied.
+        // We do typically filter out "Completed" or "Cancelled".
+        
+        int filledSlots = 0;
+        for (var doc in snapshot.docs) {
+             if (excludeBookingId != null && doc.id == excludeBookingId) continue;
+             filledSlots += 1; // 1 Booking = 1 Bed usually.
+             // If we support multiple occupants per booking in a dorm, use numberOfOccupants
+             // filledSlots += (doc.data()['numberOfOccupants'] as int? ?? 1);
+        }
+        
+        debugPrint("   Slots filled: $filledSlots / $maxCapacity");
+        
+        if (filledSlots >= maxCapacity) {
+             debugPrint("   ❌ Room is FULL!");
+             return false;
+        }
+        
+        return true; 
+
+      } else {
+        // --- GLOBAL / POOL-BASED LOGIC (Fallback) ---
+        // Dynamic Occupancy Logic (duplicated from createBooking)
+        final propertyDoc = await _firestore.collection('properties').doc(propertyId).get();
+        if (!propertyDoc.exists) {
+            debugPrint("❌ Property not found during availability check");
+            return false;
+        }
+        
+        final propertyData = propertyDoc.data()!;
+        final propertyType = propertyData['type'] as String? ?? 'Apartment';
+        final bedrooms = propertyData['bedrooms'] as int? ?? 1;
+        
+        maxCapacity = 1; 
+        if (propertyType.toLowerCase().contains('room') || 
+            propertyType.toLowerCase().contains('boarding') ||
+            propertyType.toLowerCase().contains('dorm')) {
+            maxCapacity = bedrooms > 0 ? bedrooms : 1;
+             // If property type implies "per bed", use beds count if bedrooms is just room count?
+             // User said "set rooms and beds are already occupied".
+             // If bedrooms=5, beds=10. Capacity should probably be BEDS if it's a Boarding House.
+             // Let's check 'beds'. If beds > bedrooms, use beds.
+             final beds = propertyData['beds'] as int? ?? 0;
+             if (beds > maxCapacity) maxCapacity = beds;
+        }
+        
+        debugPrint("🔍 Checking availability for Pending Property $propertyId");
+        debugPrint("   Requested: ${DateFormat('MMM dd, yyyy').format(moveInDate)} to ${DateFormat('MMM dd, yyyy').format(moveOutDate)}");
+        
+        final snapshot = await _firestore
+            .collection('bookings')
+            .where('propertyId', isEqualTo: propertyId)
+            .where('status', whereIn: ['approved', 'active'])
+            .get();
+  
+        var bookingCount = snapshot.docs.length;
+        
+        // Exclude the booking being edited from the count
+        if (excludeBookingId != null) {
+          bookingCount = snapshot.docs.where((doc) => doc.id != excludeBookingId).length;
+        }
+  
+        debugPrint("   Found $bookingCount approved/active bookings for this property (max: $maxCapacity)");
+  
+        if (bookingCount >= maxCapacity) {
+          debugPrint("   ❌ BLOCKED - Maximum bookings ($maxCapacity) reached!");
+          return false; // Property is not available
+        }
+  
+        debugPrint("   ✅ Property is AVAILABLE (${maxCapacity - bookingCount} slots remaining)");
+        return true; // Property is available
       }
-
-      debugPrint("   Found $bookingCount approved/active bookings for this property (max: $maxBookings)");
-
-      if (bookingCount >= maxBookings) {
-        debugPrint("   ❌ BLOCKED - Maximum bookings ($maxBookings) reached!");
-        return false; // Property is not available
-      }
-
-      debugPrint("   ✅ Property is AVAILABLE (${maxBookings - bookingCount} slots remaining)");
-      return true; // Property is available
     } catch (e) {
       debugPrint("❌ Error checking property availability: $e");
       return false;

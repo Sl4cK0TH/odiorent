@@ -1,5 +1,33 @@
 # Changelog
 
+## [2026-01-28 - Granular Room Management System] 🛏️
+
+### 1. Granular Room Management (Phase 9) - ADDED ✅
+**Goal**: Allow landlords to list individual rooms/units with specific pricing and capacity, rather than just a global property capacity.
+
+**Implementation**:
+- **Data Model**: Introduced `PropertyRoom` sub-collection under properties.
+- **Add Property**:
+  - Landlords can now dynamically add multiple rooms/units.
+  - Each room has its own Title, Price, Capacity, Description, and Images.
+  - Property totals (Beds, Rooms, Price) are now auto-calculated.
+- **Property Details (Renter)**:
+  - Displays a list of available rooms with real-time status (Available/Fully Booked).
+  - Users must select a specific room to book.
+  - "Fully Booked" indicator is now room-specific.
+- **Booking Flow**:
+  - Bookings are now linked to a specific `roomId` and `roomName`.
+  - Occupancy checked against specific room capacity.
+
+**Files Modified**:
+- `lib/models/property_room.dart`: Created new model.
+- `lib/services/firebase_database_service.dart`: Added room management methods.
+- `lib/screens/landlord/add_property_screen.dart`: Complete UI overhaul for room inputs.
+- `lib/screens/renter/property_details_screen.dart`: Added room list and booking logic.
+- `lib/screens/renter/create_booking_screen.dart`: Updated to accept room details.
+
+---
+
 ## [v1.0.6-alphatest] - Panel Recommendations Implementation 🚀
 
 ### 1. Verification & Compliance System (Phase 1) - ADDED ✅

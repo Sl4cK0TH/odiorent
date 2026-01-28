@@ -3,12 +3,30 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart'; // Import the package
 import 'package:odiorent/models/property.dart';
+import 'package:odiorent/models/property_room.dart'; // NEW
 import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
 import 'package:odiorent/services/cloudinary_service.dart';
 import 'package:odiorent/widgets/custom_button.dart';
 import 'package:odiorent/widgets/location_picker.dart'; // Import LocationPicker
 import 'package:path/path.dart' as p; // Import path package with prefix
+
+// Helper class for UI state before upload
+class _PendingRoom {
+  String title;
+  int capacity;
+  double price;
+  String description;
+  List<File> images;
+
+  _PendingRoom({
+    required this.title,
+    required this.capacity,
+    required this.price,
+    required this.description,
+    required this.images,
+  });
+}
 
 class AddPropertyScreen extends StatefulWidget {
   const AddPropertyScreen({super.key});
@@ -35,8 +53,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   ];
   String? _selectedBarangay;
   final _priceController = TextEditingController();
-  final _roomsController = TextEditingController();
-  final _bedsController = TextEditingController();
+  final _roomsController = TextEditingController(text: '0'); // Auto-calculated
+  final _bedsController = TextEditingController(text: '0'); // Auto-calculated
   final _showersController = TextEditingController();
   final _descriptionController = TextEditingController();
 
@@ -56,6 +74,25 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   // New: Coordinates
   double? _latitude;
   double? _longitude;
+  
+  // New: Pending Rooms
+  final List<_PendingRoom> _pendingRooms = [];
+
+  void _calculateTotals() {
+    int totalRooms = _pendingRooms.length;
+    int totalBeds = _pendingRooms.fold(0, (sum, room) => sum + room.capacity);
+    
+    // If we have rooms, use their lowest price as the "Starting Price"
+    if (_pendingRooms.isNotEmpty) {
+        double minPrice = _pendingRooms.map((r) => r.price).reduce((a, b) => a < b ? a : b);
+        _priceController.text = minPrice.toStringAsFixed(0);
+    }
+
+    setState(() {
+      _roomsController.text = totalRooms.toString();
+      _bedsController.text = totalBeds.toString();
+    });
+  }
 
   @override
   void dispose() {
@@ -162,10 +199,129 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     );
   }
 
-  void _removeVideo(int index) {
-    setState(() {
-      _selectedVideos.removeAt(index);
-    });
+  // --- Room Management Dialog ---
+  void _showAddRoomDialog() {
+    final titleController = TextEditingController();
+    final capacityController = TextEditingController();
+    final priceController = TextEditingController();
+    final descriptionController = TextEditingController();
+    List<File> roomImages = [];
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text("Add Room / Unit"),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(labelText: "Room Title (e.g., Room 101)"),
+                    ),
+                    TextField(
+                        controller: capacityController,
+                        decoration: const InputDecoration(labelText: "Capacity (Beds)"),
+                        keyboardType: TextInputType.number,
+                    ),
+                    TextField(
+                        controller: priceController,
+                        decoration: const InputDecoration(labelText: "Price (Per Month)"),
+                        keyboardType: TextInputType.number,
+                    ),
+                     TextField(
+                        controller: descriptionController,
+                        decoration: const InputDecoration(labelText: "Description (Optional)"),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text("Room Images (Required)"),
+                    const SizedBox(height: 5),
+                    Wrap(
+                        spacing: 8,
+                        children: [
+                            ...roomImages.map((img) => Stack(
+                                children: [
+                                    Image.file(img, width: 60, height: 60, fit: BoxFit.cover),
+                                    Positioned(
+                                        right: 0,
+                                        top: 0,
+                                        child: InkWell(
+                                            onTap: () {
+                                                setStateDialog(() {
+                                                    roomImages.remove(img);
+                                                });
+                                            },
+                                            child: const Icon(Icons.remove_circle, color: Colors.red, size: 20),
+                                        ),
+                                    )
+                                ],
+                            )),
+                            IconButton(
+                                icon: const Icon(Icons.add_a_photo),
+                                onPressed: () async {
+                                    final picked = await _picker.pickMultiImage();
+                                    if (picked.isNotEmpty) {
+                                        setStateDialog(() {
+                                            roomImages.addAll(picked.map((x) => File(x.path)));
+                                        });
+                                    }
+                                },
+                            ),
+                        ],
+                    )
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                    onPressed: () {
+                        if (titleController.text.isEmpty || capacityController.text.isEmpty || priceController.text.isEmpty) {
+                             Fluttertoast.showToast(msg: "Please fill Title, Capacity, and Price");
+                             return;
+                        }
+                        if (roomImages.isEmpty) {
+                            Fluttertoast.showToast(msg: "Please upload at least one image for this room");
+                            return;
+                        }
+                        
+                        final newRoom = _PendingRoom(
+                            title: titleController.text.trim(),
+                            capacity: int.tryParse(capacityController.text.trim()) ?? 1,
+                            price: double.tryParse(priceController.text.trim()) ?? 0.0,
+                            description: descriptionController.text.trim(),
+                            images: roomImages,
+                        );
+                        
+                        setState(() {
+                            _pendingRooms.add(newRoom);
+                            _calculateTotals(); // Update main form totals
+                        });
+                        
+                        Navigator.pop(context);
+                    },
+                    child: const Text("Add Room"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _removeRoom(int index) {
+      setState(() {
+          _pendingRooms.removeAt(index);
+          _calculateTotals();
+      });
   }
 
   // --- Create Property Function ---
@@ -173,7 +329,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     if (!_formKey.currentState!.validate()) return; // Check form
     if (_selectedImages.isEmpty) {
       Fluttertoast.showToast(
-        msg: "Please upload at least one image.",
+        msg: "Please upload at least one main property image.",
         backgroundColor: Colors.red,
       );
       return;
@@ -185,12 +341,12 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       );
       return;
     }
-    
-    // Warn if location not picked but allow proceeding (optional)
-    if (_latitude == null || _longitude == null) {
-       // Optional: Force location picking
-       // For now, we'll allow it but maybe start a toast
-       // Fluttertoast.showToast(msg: "No location pinned, using address only");
+    if (_pendingRooms.isEmpty) {
+       Fluttertoast.showToast(
+        msg: "Please add at least one Room/Unit.",
+        backgroundColor: Colors.red,
+      );
+      return;
     }
 
     setState(() => _isLoading = true);
@@ -201,7 +357,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         throw Exception("User not logged in.");
       }
 
-      // 1. Upload Images concurrently
+      // 1. Upload Main Property Images
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final uploadTasks = _selectedImages.asMap().entries.map((entry) async {
         final imageFile = entry.value;
@@ -220,13 +376,11 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       }).toList();
       final imageUrls = await Future.wait(uploadTasks);
 
-      // 2. Upload Videos with compression
+      // 2. Upload Video
       setState(() => _isUploadingVideo = true);
       final List<String> videoUrls = [];
       for (int i = 0; i < _selectedVideos.length; i++) {
         final videoFile = _selectedVideos[i];
-        setState(() => _videoUploadProgress = (i + 1) / _selectedVideos.length * 0.5);
-        
         final videoUrl = await _storageService.uploadVideoWithCompression(
           videoFile: videoFile,
           folder: 'virtual_tours',
@@ -245,35 +399,65 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
       // 3. Create Property Object
       final fullAddress = "${_streetAddressController.text.trim()}, $_selectedBarangay, Odiongan, Romblon";
+      
+      // Note: Rooms/Beds/Price are derived or taken from inputs (which were auto-updated)
+      // We ensure price is consistent with rooms
+      
       final newProperty = Property(
         landlordId: userId,
         name: _nameController.text.trim(),
         address: fullAddress,
         description: _descriptionController.text.trim(),
-        price: double.parse(_priceController.text.trim()),
+        price: double.parse(_priceController.text.trim()), // Starting price
         rooms: int.parse(_roomsController.text.trim()),
         beds: int.parse(_bedsController.text.trim()),
         showers: int.parse(_showersController.text.trim()),
         imageUrls: imageUrls,
         videoUrls: videoUrls,
-        status: PropertyStatus.pending, // Always 'pending' on creation
-        createdAt: DateTime.now().toUtc(), // Set creation date
-        latitude: _latitude, // New
-        longitude: _longitude, // New
+        status: PropertyStatus.pending,
+        createdAt: DateTime.now().toUtc(),
+        latitude: _latitude,
+        longitude: _longitude,
       );
 
-      // 4. Save to Database
-      await _dbService.createProperty(newProperty);
+      // 4. Save Property & Get ID
+      final String propertyId = await _dbService.createProperty(newProperty);
+
+      // 5. Upload & Create Rooms
+      for (int i = 0; i < _pendingRooms.length; i++) {
+          final room = _pendingRooms[i];
+          
+          // Upload Room Images
+          final roomUploadTasks = room.images.asMap().entries.map((entry) async {
+            final f = entry.value;
+            final b = await f.readAsBytes();
+            final ext = p.extension(f.path).isEmpty ? '.jpg' : p.extension(f.path);
+            final fname = 'room_${propertyId}_${i}_${entry.key}$ext';
+            return _storageService.uploadFile(folder: 'rooms', bytes: b, fileName: fname, userId: userId);
+          }).toList();
+          
+          final roomImageUrls = await Future.wait(roomUploadTasks);
+          
+          final propertyRoom = PropertyRoom(
+              propertyId: propertyId,
+              title: room.title,
+              description: room.description,
+              price: room.price,
+              capacity: room.capacity,
+              imageUrls: roomImageUrls,
+              createdAt: DateTime.now(),
+          );
+          
+          await _dbService.addRoomToProperty(propertyId, propertyRoom);
+      }
 
       if (!mounted) return;
 
       Fluttertoast.showToast(
-        msg: "Property submitted for review!",
+        msg: "Property & Rooms submitted successfully!",
         backgroundColor: Colors.green,
       );
 
-      // 5. Go back to home screen
-      // Pass 'true' back to tell the home screen to refresh
       Navigator.of(context).pop(true);
     } catch (e) {
       Fluttertoast.showToast(
@@ -386,6 +570,47 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 ),
                 const SizedBox(height: 16),
 
+                  const SizedBox(height: 16),
+                  
+                  // --- Rooms Section ---
+                  const Text("Rooms / Units", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  if (_pendingRooms.isEmpty)
+                    Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(child: Text("No rooms added yet. Please add at least one.")),
+                    ),
+                  ..._pendingRooms.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final room = entry.value;
+                      return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          child: ListTile(
+                              leading: room.images.isNotEmpty 
+                                ? Image.file(room.images.first, width: 50, height: 50, fit: BoxFit.cover)
+                                : const Icon(Icons.bed),
+                              title: Text(room.title),
+                              subtitle: Text("${room.capacity} Beds • ₱${room.price.toStringAsFixed(0)}/mo"),
+                              trailing: IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => _removeRoom(index),
+                              ),
+                          ),
+                      );
+                  }),
+                  const SizedBox(height: 8),
+                  CustomButton(
+                      text: "Add Room",
+                      onPressed: _showAddRoomDialog,
+                      backgroundColor: Colors.orange,
+                  ),
+                  const Divider(height: 32),
+                  
                   _buildTextField(
                     controller: _descriptionController,
                     labelText: 'Description',
@@ -395,7 +620,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                   const SizedBox(height: 16),
                   _buildTextField(
                     controller: _priceController,
-                    labelText: 'Price (₱)',
+                    labelText: 'Starting Price (₱)',
                     prefixIcon: Icons.attach_money,
                     keyboardType: TextInputType.number,
                     validator: (value) => _validateNumber(
@@ -405,26 +630,22 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _roomsController,
-                    labelText: 'Rooms',
-                    prefixIcon: Icons.meeting_room,
-                    keyboardType: TextInputType.number,
-                    validator: (value) => _validateNumber(
-                      value,
-                      emptyMessage: 'Number of rooms is required',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _bedsController,
-                    labelText: 'Beds',
-                    prefixIcon: Icons.bed,
-                    keyboardType: TextInputType.number,
-                    validator: (value) => _validateNumber(
-                      value,
-                      emptyMessage: 'Number of beds is required',
-                    ),
+                  Row(
+                    children: [
+                        Expanded(child: _buildTextField(
+                            controller: _roomsController,
+                            labelText: "Total Rooms",
+                            prefixIcon: Icons.meeting_room,
+                            readOnly: true,
+                        )),
+                        const SizedBox(width: 10),
+                         Expanded(child: _buildTextField(
+                            controller: _bedsController,
+                            labelText: "Total Capacity (Beds)",
+                            prefixIcon: Icons.bed,
+                            readOnly: true,
+                        )),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   _buildTextField(
@@ -630,6 +851,12 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     );
   }
 
+  void _removeVideo(int index) {
+    setState(() {
+      _selectedVideos.removeAt(index);
+    });
+  }
+
   // Helper widget for text fields
   Widget _buildTextField({
     required TextEditingController controller,
@@ -638,34 +865,36 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
     int? maxLines = 1,
+    bool readOnly = false,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      readOnly: readOnly,
+      style: readOnly ? const TextStyle(color: Colors.grey) : null,
       decoration: InputDecoration(
         labelText: labelText,
         prefixIcon: Icon(prefixIcon, color: primaryGreen),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.grey[400]!),
+        filled: true,
+        fillColor: readOnly ? Colors.grey[200] : Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10.0),
+          borderSide: BorderSide(color: Colors.grey[300]!),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: const BorderSide(color: primaryGreen, width: 2.0),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10.0),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(10.0)),
+          borderSide: BorderSide(color: primaryGreen, width: 2.0),
         ),
       ),
-      validator:
-          validator ??
-          (value) {
-            if (value == null || value.isEmpty) {
-              return 'This field cannot be empty';
-            }
-            return null;
-          },
+      validator: validator,
     );
   }
+
 
   String? _validateNumber(
     String? value, {

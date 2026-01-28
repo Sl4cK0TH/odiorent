@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:odiorent/models/property.dart';
+import 'package:odiorent/models/property_room.dart'; // New
 import 'package:odiorent/services/firebase_auth_service.dart';
 import 'package:odiorent/services/firebase_database_service.dart';
 
 class CreateBookingScreen extends StatefulWidget {
   final Property property;
+  final PropertyRoom? room; // New
 
-  const CreateBookingScreen({super.key, required this.property});
+  const CreateBookingScreen({super.key, required this.property, this.room});
 
   @override
   State<CreateBookingScreen> createState() => _CreateBookingScreenState();
@@ -41,8 +43,8 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
   bool _isCheckingAvailability = false;
 
   // Financial calculations
-  double get _monthlyRent => widget.property.price;
-  double get _securityDeposit => _monthlyRent * 2; // 2 months security deposit
+  double get _monthlyRent => widget.room?.price ?? widget.property.price;
+  double get _securityDeposit => _monthlyRent * 0.5; // Changed to 50%
   double get _totalAmount => (_monthlyRent * _durationMonths) + _securityDeposit;
 
   @override
@@ -143,10 +145,11 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
         propertyId: widget.property.id!,
         moveInDate: _selectedMoveInDate!,
         moveOutDate: moveOutDate,
+        roomId: widget.room?.id,
       );
 
       if (!isAvailable) {
-        throw Exception('Property is not available for the selected dates');
+        throw Exception('Property/Room is not available for the selected dates');
       }
 
       final numberOfOccupants = int.parse(_numberOfOccupantsController.text);
@@ -155,12 +158,16 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
         propertyId: widget.property.id!,
         renterId: currentUser.uid,
         landlordId: widget.property.landlordId,
-        propertyName: widget.property.name,
+        propertyName: widget.room != null 
+             ? "${widget.property.name} - ${widget.room!.title}"
+             : widget.property.name,
         propertyAddress: widget.property.address,
-        propertyPrice: widget.property.price,
-        propertyImageUrl: widget.property.imageUrls.isNotEmpty 
-            ? widget.property.imageUrls[0] 
-            : null,
+        propertyPrice: widget.room?.price ?? widget.property.price,
+        propertyImageUrl: widget.room?.imageUrls.isNotEmpty == true 
+             ? widget.room!.imageUrls.first 
+             : (widget.property.imageUrls.isNotEmpty 
+                  ? widget.property.imageUrls.first 
+                  : null),
         renterName: _renterNameController.text.trim(),
         renterEmail: currentUser.email,
         renterPhone: currentUser.phoneNumber,
@@ -172,6 +179,8 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
             : null,
         monthlyRent: _monthlyRent,
         securityDeposit: _securityDeposit,
+        roomId: widget.room?.id, 
+        roomName: widget.room?.title,
       );
 
       if (mounted) {

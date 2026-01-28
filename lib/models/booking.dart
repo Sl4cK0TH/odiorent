@@ -79,6 +79,10 @@ class Booking {
   final DateTime? paymentVerifiedAt;
   final String? landlordMessage;
   final DateTime? paymentSubmittedAt;
+  
+  // Room details (Granular Management)
+  final String? roomId;
+  final String? roomName;
 
   Booking({
     this.id,
@@ -113,6 +117,8 @@ class Booking {
     this.paymentVerifiedAt,
     this.landlordMessage,
     this.paymentSubmittedAt,
+    this.roomId,
+    this.roomName,
   });
 
   /// Convert to Firestore document
@@ -149,6 +155,8 @@ class Booking {
       'paymentVerifiedAt': paymentVerifiedAt != null ? Timestamp.fromDate(paymentVerifiedAt!) : null,
       'landlordMessage': landlordMessage,
       'paymentSubmittedAt': paymentSubmittedAt != null ? Timestamp.fromDate(paymentSubmittedAt!) : null,
+      'roomId': roomId,
+      'roomName': roomName,
     };
   }
 
@@ -200,6 +208,8 @@ class Booking {
       paymentSubmittedAt: data['paymentSubmittedAt'] != null 
           ? (data['paymentSubmittedAt'] as Timestamp).toDate() 
           : null,
+      roomId: data['roomId'] as String?,
+      roomName: data['roomName'] as String?,
     );
   }
 
@@ -237,6 +247,8 @@ class Booking {
     DateTime? paymentVerifiedAt,
     String? landlordMessage,
     DateTime? paymentSubmittedAt,
+    String? roomId,
+    String? roomName,
   }) {
     return Booking(
       id: id ?? this.id,
@@ -271,6 +283,8 @@ class Booking {
       paymentVerifiedAt: paymentVerifiedAt ?? this.paymentVerifiedAt,
       landlordMessage: landlordMessage ?? this.landlordMessage,
       paymentSubmittedAt: paymentSubmittedAt ?? this.paymentSubmittedAt,
+      roomId: roomId ?? this.roomId,
+      roomName: roomName ?? this.roomName,
     );
   }
 
