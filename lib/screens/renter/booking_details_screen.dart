@@ -614,6 +614,14 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       return _buildSection(
           'Payment Information',
           [
+              // Landlord GCash Number
+              if (bookingData['landlordGcashNumber'] != null) ...[
+                  _buildInfoRow('Landlord GCash No', bookingData['landlordGcashNumber'] as String),
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 8),
+              ],
+              
               if (proofUrl != null) ...[
                  Row(
                    mainAxisAlignment: MainAxisAlignment.spaceBetween,

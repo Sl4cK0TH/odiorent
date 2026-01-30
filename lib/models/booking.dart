@@ -83,6 +83,9 @@ class Booking {
   // Room details (Granular Management)
   final String? roomId;
   final String? roomName;
+  
+  // Landlord payment details
+  final String? landlordGcashNumber;
 
   Booking({
     this.id,
@@ -119,6 +122,7 @@ class Booking {
     this.paymentSubmittedAt,
     this.roomId,
     this.roomName,
+    this.landlordGcashNumber,
   });
 
   /// Convert to Firestore document
@@ -157,6 +161,7 @@ class Booking {
       'paymentSubmittedAt': paymentSubmittedAt != null ? Timestamp.fromDate(paymentSubmittedAt!) : null,
       'roomId': roomId,
       'roomName': roomName,
+      'landlordGcashNumber': landlordGcashNumber,
     };
   }
 
@@ -210,6 +215,7 @@ class Booking {
           : null,
       roomId: data['roomId'] as String?,
       roomName: data['roomName'] as String?,
+      landlordGcashNumber: data['landlordGcashNumber'] as String?,
     );
   }
 
@@ -249,6 +255,7 @@ class Booking {
     DateTime? paymentSubmittedAt,
     String? roomId,
     String? roomName,
+    String? landlordGcashNumber,
   }) {
     return Booking(
       id: id ?? this.id,
@@ -285,6 +292,7 @@ class Booking {
       paymentSubmittedAt: paymentSubmittedAt ?? this.paymentSubmittedAt,
       roomId: roomId ?? this.roomId,
       roomName: roomName ?? this.roomName,
+      landlordGcashNumber: landlordGcashNumber ?? this.landlordGcashNumber,
     );
   }
 

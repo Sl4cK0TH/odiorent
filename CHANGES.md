@@ -1,5 +1,37 @@
 # Changelog
 
+## [2026-01-30 - Landlord GCash & Booking Notice] 💳
+
+### 1. Landlord GCash Number Display (Phase 10) - ADDED ✅
+**Goal**: Display landlord's GCash number in booking details for renters to make payments.
+
+**Implementation**:
+- **Booking Model**: Added `landlordGcashNumber` field.
+- **Booking Creation**: Automatically copies landlord's phone number as GCash.
+- **Renter View**: Displays "Landlord GCash No" in Payment Information section.
+- **Landlord View**: Shows editable GCash field (only while booking is pending, locked after approval).
+
+**Files Modified**:
+- `lib/models/booking.dart`: Added new field.
+- `lib/services/firebase_database_service.dart`: Added `updateBookingGcashNumber()` method.
+- `lib/screens/renter/booking_details_screen.dart`: Display GCash number.
+- `lib/screens/landlord/landlord_booking_details_screen.dart`: Editable GCash section.
+
+---
+
+### 2. 24-Hour Booking Notice Popup - ADDED ✅
+**Goal**: Inform renters about the 24-hour payment deadline before submitting booking requests.
+
+**Implementation**:
+- Added confirmation dialog in `CreateBookingScreen` before booking submission.
+- Dialog explains the landlord review process and 24-hour payment deadline.
+- User must confirm before booking is created.
+
+**Files Modified**:
+- `lib/screens/renter/create_booking_screen.dart`: Added confirmation popup.
+
+---
+
 ## [2026-01-28 - Granular Room Management System] 🛏️
 
 ### 1. Granular Room Management (Phase 9) - ADDED ✅

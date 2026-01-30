@@ -631,6 +631,9 @@ class _LandlordBookingDetailsScreenState extends State<LandlordBookingDetailsScr
                   ],
                 ),
 
+                // GCash Number Section (Editable for Landlord only when pending)
+                _buildGcashSection(bookingData),
+
                 // Payment Verification
                 _buildPaymentVerificationSection(bookingData),
 
@@ -944,5 +947,100 @@ class _LandlordBookingDetailsScreenState extends State<LandlordBookingDetailsScr
           ],
       );
   }
+
+  /// Build the GCash number section with edit capability for pending bookings
+  Widget _buildGcashSection(Map<String, dynamic> bookingData) {
+    final gcashNumber = bookingData['landlordGcashNumber'] as String?;
+    final status = bookingData['status'] as String?;
+    final isPending = status == 'pending';
+    
+    if (gcashNumber == null && !isPending) {
+      return const SizedBox.shrink();
     }
 
+    return _buildSection(
+      'Your GCash Number',
+      [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                gcashNumber ?? 'Not set',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: gcashNumber == null ? Colors.grey : Colors.black,
+                ),
+              ),
+            ),
+            if (isPending)
+              TextButton.icon(
+                onPressed: () => _showEditGcashDialog(gcashNumber),
+                icon: const Icon(Icons.edit, size: 18),
+                label: const Text('Edit'),
+                style: TextButton.styleFrom(foregroundColor: Colors.blue),
+              ),
+          ],
+        ),
+        if (!isPending && gcashNumber != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              'GCash number is locked after booking approval',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _showEditGcashDialog(String? currentNumber) async {
+    final controller = TextEditingController(text: currentNumber ?? '');
+    
+    final newNumber = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update GCash Number'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.phone,
+          decoration: const InputDecoration(
+            labelText: 'GCash Number',
+            hintText: 'e.g. +63 9XX XXX XXXX',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (newNumber != null && newNumber.isNotEmpty && mounted) {
+      try {
+        await _dbService.updateBookingGcashNumber(widget.bookingId, newNumber);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('GCash number updated successfully!'), backgroundColor: Colors.green),
+          );
+          setState(() {}); // Refresh UI
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+    controller.dispose();
+  }
+    }

@@ -1443,6 +1443,17 @@ class FirebaseDatabaseService {
       
       debugPrint("✅ Property/Room available. Creating booking...");
 
+      // Fetch landlord's phone number to use as GCash number
+      String? landlordGcashNumber;
+      try {
+        final landlordDoc = await _firestore.collection('users').doc(landlordId).get();
+        if (landlordDoc.exists) {
+          landlordGcashNumber = landlordDoc.data()?['phone_number'] as String?;
+        }
+      } catch (e) {
+        debugPrint("⚠️ Could not fetch landlord phone number: $e");
+      }
+
       final bookingData = {
         'propertyId': propertyId,
         'renterId': renterId,
@@ -1466,6 +1477,7 @@ class FirebaseDatabaseService {
         'createdAt': FieldValue.serverTimestamp(),
         'roomId': roomId, // New
         'roomName': roomName, // New
+        'landlordGcashNumber': landlordGcashNumber, // New
       };
 
       final docRef = await _firestore.collection('bookings').add(bookingData);
@@ -1497,6 +1509,30 @@ class FirebaseDatabaseService {
       return docRef.id;
     } catch (e) {
       debugPrint("❌ Error creating booking: $e");
+      rethrow;
+    }
+  }
+
+  /// Update the landlord's GCash number on a booking (only allowed if status is 'pending')
+  Future<void> updateBookingGcashNumber(String bookingId, String newGcashNumber) async {
+    try {
+      final bookingDoc = await _firestore.collection('bookings').doc(bookingId).get();
+      if (!bookingDoc.exists) {
+        throw Exception('Booking not found');
+      }
+      
+      final status = bookingDoc.data()?['status'] as String?;
+      if (status != 'pending') {
+        throw Exception('GCash number can only be updated for pending bookings');
+      }
+      
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'landlordGcashNumber': newGcashNumber,
+      });
+      
+      debugPrint("✅ Updated GCash number for booking $bookingId");
+    } catch (e) {
+      debugPrint("❌ Error updating GCash number: $e");
       rethrow;
     }
   }
